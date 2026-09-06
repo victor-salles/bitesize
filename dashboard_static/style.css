@@ -214,6 +214,18 @@ button.danger { color: var(--danger); border-color: #fecaca; }
 .preview-error { color: var(--danger); font-size: 0.9rem; }
 .preview-empty { color: var(--muted); font-size: 0.9rem; }
 
+.preview-more {
+  margin-top: 0.45rem;
+  padding: 0.2rem 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.preview-more:hover { text-decoration: underline; }
+
 footer {
   color: var(--muted);
   font-size: 0.85rem;

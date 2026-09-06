@@ -9,6 +9,13 @@ Open problems seen in the running app. There is no GitHub issue tracker yet. Clo
 
 Seen on 29–30 August 2026 in `output/logs/digest-stdout.log`. Hypothesis: timeout or model error on large batches, not a missing CLI (later calls in the same run succeed).
 
+## Preview showed “No headlines” for every source
+
+**Expected:** Preview lists recent titles per feed.  
+**Actual:** Every source said “No headlines returned.” The dashboard process had inherited an HTTP proxy (`127.0.0.1:61630`) that rejected RSS tunnels with 403. Failed downloads also returned an empty list, so the UI hid the error.
+
+**Landed:** RSS fetch ignores env proxies; Preview treats a failed download as an error, not an empty feed.
+
 ## AP News feed returns 403
 
 **Expected:** The World “AP News” source contributes headlines.  

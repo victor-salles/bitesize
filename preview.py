@@ -9,14 +9,21 @@ from feed import fetch_feed
 
 FetchFn = Callable[..., list[dict]]
 
+PREVIEW_VISIBLE_DEFAULT = 5
+PREVIEW_FETCH_LIMIT = 40
+
 
 def build_source_preview(
     sources: dict,
     fetch_fn: FetchFn | None = None,
-    max_headlines: int = 5,
+    max_headlines: int = PREVIEW_FETCH_LIMIT,
 ) -> dict:
     """Return categories/feeds with recent headlines so a reader can keep or drop sources."""
-    fetch = fetch_fn or fetch_feed
+    fetch = fetch_fn or (
+        lambda name, url, max_articles=None: fetch_feed(
+            name, url, max_articles=max_articles, fail_soft=False
+        )
+    )
     categories_out: list[dict] = []
     jobs: list[tuple[dict, dict]] = []
 

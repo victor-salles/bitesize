@@ -306,7 +306,7 @@ async function loadPreview() {
   setStatus(status, "Fetching headlines…", true);
   root.innerHTML = "";
   try {
-    const data = await api("/api/preview?max=5");
+    const data = await api("/api/preview");
     renderPreview(data);
     setStatus(status, "Headlines loaded. Use Include to keep or drop a source.", true);
   } catch (e) {
@@ -360,35 +360,61 @@ function renderPreview(data) {
         err.textContent = feed.error;
         block.appendChild(err);
       }
+      const items = feed.headlines || [];
       const list = document.createElement("ol");
       list.className = "preview-headlines";
-      for (const item of feed.headlines || []) {
-        const li = document.createElement("li");
-        if (item.url) {
-          const a = document.createElement("a");
-          a.href = item.url;
-          a.target = "_blank";
-          a.rel = "noopener";
-          a.textContent = item.title;
-          li.appendChild(a);
+      const moreBtn = document.createElement("button");
+      moreBtn.type = "button";
+      moreBtn.className = "preview-more";
+      let expanded = false;
+
+      const paintHeadlines = () => {
+        list.innerHTML = "";
+        const visible = expanded ? items : items.slice(0, 5);
+        for (const item of visible) {
+          const li = document.createElement("li");
+          if (item.url) {
+            const a = document.createElement("a");
+            a.href = item.url;
+            a.target = "_blank";
+            a.rel = "noopener";
+            a.textContent = item.title;
+            li.appendChild(a);
+          } else {
+            li.textContent = item.title;
+          }
+          if (item.published) {
+            const t = document.createElement("span");
+            t.className = "preview-time";
+            t.textContent = item.published;
+            li.append(" ", t);
+          }
+          list.appendChild(li);
+        }
+        if (items.length > 5) {
+          const hidden = items.length - 5;
+          moreBtn.hidden = false;
+          moreBtn.textContent = expanded
+            ? "Show fewer"
+            : `Show more (${hidden} more)`;
         } else {
-          li.textContent = item.title;
+          moreBtn.hidden = true;
         }
-        if (item.published) {
-          const t = document.createElement("span");
-          t.className = "preview-time";
-          t.textContent = item.published;
-          li.append(" ", t);
-        }
-        list.appendChild(li);
-      }
-      if (!feed.headlines?.length && !feed.error) {
+      };
+      moreBtn.onclick = () => {
+        expanded = !expanded;
+        paintHeadlines();
+      };
+
+      if (!items.length && !feed.error) {
         const empty = document.createElement("p");
         empty.className = "preview-empty";
         empty.textContent = "No headlines returned.";
         block.appendChild(empty);
       } else {
         block.appendChild(list);
+        block.appendChild(moreBtn);
+        paintHeadlines();
       }
       card.appendChild(block);
     }

@@ -118,8 +118,9 @@ def test_preview_returns_headlines(client, monkeypatch):
         headers=auth,
     )
 
-    def fake_preview(sources, fetch_fn=None, max_headlines=5):
-        assert max_headlines == 5
+    def fake_preview(sources, fetch_fn=None, max_headlines=40):
+        from preview import PREVIEW_FETCH_LIMIT
+        assert max_headlines == PREVIEW_FETCH_LIMIT
         return {
             "categories": [
                 {

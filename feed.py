@@ -15,7 +15,9 @@ def _download_url(url: str, quiet: bool = False) -> bytes | None:
     """Fetch URL bytes using certifi-backed TLS (macOS Python venv safe)."""
     settings = get_settings()
     try:
-        response = requests.get(
+        session = requests.Session()
+        session.trust_env = False
+        response = session.get(
             url,
             timeout=settings.feed_timeout,
             headers={"User-Agent": settings.user_agent},
@@ -110,6 +112,7 @@ def fetch_feed(
     source_name: str,
     url: str,
     max_articles: int | None = None,
+    fail_soft: bool = True,
 ) -> list[dict]:
     """Fetch one RSS feed; return a list of cleaned article dicts."""
     if max_articles is None:
@@ -117,6 +120,8 @@ def fetch_feed(
     try:
         raw = _download_url(url)
         if raw is None:
+            if not fail_soft:
+                raise RuntimeError(f"fetch failed {url}")
             return []
         feed = feedparser.parse(raw)
         if feed.bozo and not feed.entries:
@@ -159,4 +164,6 @@ def fetch_feed(
 
     except Exception as exc:
         console.print(f"  [yellow]⚠  {source_name}: {exc}[/yellow]")
+        if not fail_soft:
+            raise
         return []
