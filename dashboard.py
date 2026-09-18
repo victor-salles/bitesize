@@ -10,7 +10,9 @@ from flask import Flask, jsonify, request, send_from_directory
 
 import settings_store as store
 from config import BASE_DIR, load_env, reload_settings
+import jev_labels
 import jev_log
+from themes import list_themes
 from kindle import send_test_email
 from preview import PREVIEW_FETCH_LIMIT, build_source_preview
 
@@ -171,10 +173,51 @@ def list_jev_runs():
 
 @app.get("/api/jev/runs/<run_id>")
 def get_jev_run(run_id: str):
+    payload = jev_labels.attach_labels(jev_log.load_run(run_id))
+    if payload is None:
+        return jsonify({"error": "Run not found"}), 404
+    payload["themes"] = list_themes()
+    return jsonify(payload)
+
+
+@app.post("/api/jev/labels")
+def save_jev_label():
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return jsonify({"error": "Expected JSON object"}), 400
+    run_id = str(data.get("run_id") or "")
     payload = jev_log.load_run(run_id)
     if payload is None:
         return jsonify({"error": "Run not found"}), 404
-    return jsonify(payload)
+    items = payload.get("items") or []
+    try:
+        index = int(data.get("index"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "index required"}), 400
+    if index < 0 or index >= len(items):
+        return jsonify({"error": "index out of range"}), 400
+    item = items[index]
+    patch = {
+        k: data[k]
+        for k in (
+            "keep",
+            "ad",
+            "clickbait",
+            "press_release",
+            "paywall_teaser",
+            "relevance",
+            "tipo",
+            "temas",
+        )
+        if k in data
+    }
+    human = jev_labels.save_label(run_id, item, patch)
+    return jsonify({"ok": True, "human": human, "index": index})
+
+
+@app.get("/api/jev/labels/export")
+def export_jev_labels():
+    return jsonify({"rows": jev_labels.export_rows()})
 
 
 @app.post("/api/kindle/test")

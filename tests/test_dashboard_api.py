@@ -131,6 +131,66 @@ def test_jev_runs_api_lists_and_loads_json(client, tmp_path, monkeypatch):
     assert missing.status_code == 404
 
 
+def test_jev_run_includes_theme_catalog(client, tmp_path, monkeypatch):
+    import jev_log
+    from themes import list_themes
+
+    monkeypatch.setattr(jev_log, "JEV_DIR", tmp_path / "jev")
+    jev_log.write_run(
+        [{"title": "Story", "source": "G1", "skip": False, "relevance": 50}],
+    )
+    run_id = client.get("/api/jev/runs").get_json()["runs"][0]["id"]
+    detail = client.get("/api/jev/runs/" + run_id)
+    assert detail.status_code == 200
+    body = detail.get_json()
+    assert "themes" in body
+    assert body["themes"] == list_themes()
+
+
+def test_jev_label_save_and_export(client, tmp_path, monkeypatch):
+    import jev_labels
+    import jev_log
+
+    monkeypatch.setattr(jev_log, "JEV_DIR", tmp_path / "jev")
+    monkeypatch.setattr(jev_labels, "LABELS_PATH", tmp_path / "jev_labels.json")
+    jev_log.write_run(
+        [
+            {
+                "title": "Story",
+                "source": "G1",
+                "link": "https://ex.com/s",
+                "skip": False,
+                "relevance": 70,
+                "tipo": "resumo",
+                "temas": ["mundo"],
+                "jev": {"answers": {"keep": 0.8, "ad": 0.01}},
+            }
+        ]
+    )
+    run_id = client.get("/api/jev/runs").get_json()["runs"][0]["id"]
+    denied = client.post(
+        "/api/jev/labels",
+        json={"run_id": run_id, "index": 0, "ad": 0.15},
+    )
+    assert denied.status_code == 401
+    saved = client.post(
+        "/api/jev/labels",
+        json={"run_id": run_id, "index": 0, "ad": 0.15, "relevance": 20},
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert saved.status_code == 200
+    assert saved.get_json()["human"]["ad"] == 0.15
+    detail = client.get("/api/jev/runs/" + run_id)
+    assert detail.get_json()["items"][0]["human"]["ad"] == 0.15
+    assert "themes" in detail.get_json()
+    export = client.get("/api/jev/labels/export")
+    assert export.status_code == 200
+    rows = export.get_json()["rows"]
+    assert rows[0]["label"]["ad"] == 0.15
+    assert rows[0]["predicted"]["ad"] == 0.01
+
+
+
 def test_resolve_dashboard_token_from_file(tmp_path, monkeypatch):
     token_file = tmp_path / "dashboard.token"
     token_file.write_text("file-token\n", encoding="utf-8")

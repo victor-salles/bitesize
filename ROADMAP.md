@@ -8,7 +8,7 @@ The morning pipeline is in daily use: RSS → full text → AI filter/summarize/
 
 - **Settings live in SQLite** (`data/bitesize.db`), edited from the local dashboard. `.env` / `sources.json` only seed an empty database.
 - **Three AI backends:** Antigravity (`agy`, default), Gemini CLI, Ollama. If none answer, the EPUB still writes with length-based scores and no summaries.
-- **Optional Jev triage:** TypeSafe scores ads, keep/drop, relevance, `resumo` vs `artigo-completo`, and pt-BR temas. Off until `jev_triage_enabled` is on and `TYPESAFE_API_KEY` is in `.env`. The writing model still writes summaries and covers.
+- **Optional Jev triage:** TypeSafe scores ads, keep/drop, relevance, `resumo` vs `artigo-completo`, and pt-BR temas. Each call sends title, source, a ~480-character snippet, and `body_chars` — not the full article. Off until `jev_triage_enabled` is on and `TYPESAFE_API_KEY` is in `.env`. The writing model still writes summaries and covers.
 - **pt-BR labels and prompts** (`ai_locale.py`). Language is a setting, not a rewrite of the pipeline.
 - **Paywall mirrors** when the direct fetch is thin or fails.
 - **Gmail and Calendar sections** are wired in `main.py` and off by default. Enable them in the dashboard; the daily `--all` run will pick them up.
@@ -17,7 +17,7 @@ The morning pipeline is in daily use: RSS → full text → AI filter/summarize/
 - **Scoring:** fallback stays below 70; cover and section leads prefer AI scores over length stand-ins; clustered AI batches get one listwise re-rank.
 - **Open-source hygiene:** MIT license, `SECURITY.md`, pytest + coverage + pip-audit + gitleaks CI, Dependabot, GitHub issue templates.
 
-The dashboard **Preview** tab now loads live headlines per source. **Jev** tab lists each classify run and the JSON file under `output/jev/`. Still missing: last-digest preview, AI summary preview, magazine cover preview.
+The dashboard **Preview** tab now loads live headlines per source. **Jev** tab lists each classify run and the JSON file under `output/jev/`. English chrome by default (`ui_language` / localStorage); Rel, Ad, and per-theme scores use percent + bar (no Keep column or rel/keep/ad filter sliders). You can correct Ad, Rel, Tipo, Temas, and the extra scores per story; **Export labels** writes a gold file for later question/threshold work. Still missing: last-digest preview, AI summary preview, magazine cover preview, Jev field picker.
 
 ## Next
 
