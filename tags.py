@@ -2,26 +2,22 @@
 
 from __future__ import annotations
 
+import logging
 import re
+import sqlite3
 from difflib import SequenceMatcher
 
 from config import get_settings
 
+logger = logging.getLogger(__name__)
+
 TIPOS = frozenset({"resumo", "artigo-completo"})
 
-_FALLBACK_TEMAS = frozenset({
-    "política",
-    "saúde",
-    "economia",
-    "tecnologia",
-    "mundo",
-    "brasil",
-    "cultura",
-    "esportes",
-    "ciência",
-    "opinião",
-    "clima",
-})
+
+def _default_tema_ids() -> frozenset[str]:
+    from themes import DEFAULT_THEMES
+
+    return frozenset(t["id"] for t in DEFAULT_THEMES)
 
 
 def _enabled_tema_ids() -> frozenset[str]:
@@ -31,9 +27,9 @@ def _enabled_tema_ids() -> frozenset[str]:
         rows = list_themes()
         if rows:
             return frozenset(t["id"] for t in rows if t["enabled"])
-    except Exception:
-        pass
-    return _FALLBACK_TEMAS
+    except (OSError, sqlite3.Error) as exc:
+        logger.warning("jev themes unavailable, using defaults: %s", exc)
+    return _default_tema_ids()
 
 
 TEMAS = _enabled_tema_ids()
