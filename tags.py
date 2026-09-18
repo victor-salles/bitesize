@@ -9,7 +9,7 @@ from config import get_settings
 
 TIPOS = frozenset({"resumo", "artigo-completo"})
 
-TEMAS = frozenset({
+_FALLBACK_TEMAS = frozenset({
     "política",
     "saúde",
     "economia",
@@ -22,6 +22,21 @@ TEMAS = frozenset({
     "opinião",
     "clima",
 })
+
+
+def _enabled_tema_ids() -> frozenset[str]:
+    try:
+        from themes import list_themes
+
+        rows = list_themes()
+        if rows:
+            return frozenset(t["id"] for t in rows if t["enabled"])
+    except Exception:
+        pass
+    return _FALLBACK_TEMAS
+
+
+TEMAS = _enabled_tema_ids()
 
 # Paywall/snippet heuristics apply only to bodies no longer than this multiple of min_body_chars.
 TIPO_SHORT_BODY_MULTIPLIER = 2
