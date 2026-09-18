@@ -20,6 +20,7 @@
     <button class="tab active" data-tab="settings">Settings</button>
     <button class="tab" data-tab="sources">Sources</button>
     <button class="tab" data-tab="preview">Preview</button>
+    <button class="tab" data-tab="jev">Jev</button>
     <button class="tab" data-tab="kindle">Kindle</button>
   </nav>
 
@@ -48,6 +49,16 @@
       <div id="preview-list"></div>
     </section>
 
+    <section id="panel-jev" class="panel">
+      <p class="preview-intro">Each digest that runs Jev writes a JSON file under <code>output/jev/</code>. Open a run to see every score Jev returned.</p>
+      <div class="toolbar">
+        <button id="refresh-jev" class="primary">Reload runs</button>
+      </div>
+      <p id="jev-status" class="status"></p>
+      <div id="jev-run-list"></div>
+      <div id="jev-run-detail"></div>
+    </section>
+
     <section id="panel-kindle" class="panel">
       <div id="kindle-fields" class="card"></div>
       <div class="actions">
@@ -59,7 +70,7 @@
   </main>
 
   <footer>
-    <p>Backlog: AI summary preview, magazine covers</p>
+    <p>Jev runs are on the Jev tab. Still open: last-digest preview and magazine covers.</p>
   </footer>
 
   <script src="/app.js"></script>

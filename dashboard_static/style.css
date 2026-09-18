@@ -226,6 +226,51 @@ button.danger { color: var(--danger); border-color: #fecaca; }
 
 .preview-more:hover { text-decoration: underline; }
 
+.jev-run {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin-bottom: 0.4rem;
+}
+
+.jev-run:hover { border-color: var(--accent); }
+
+.jev-meta {
+  color: var(--muted);
+  font-size: 0.85rem;
+  word-break: break-all;
+}
+
+.jev-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  margin: 0.75rem 0;
+}
+
+.jev-table th, .jev-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 0.35rem 0.4rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.jev-table tbody tr { cursor: pointer; }
+.jev-table tbody tr:hover { background: #eef2ff; }
+.jev-skip { color: var(--muted); }
+.jev-error { color: var(--danger); }
+.jev-source { color: var(--muted); font-size: 0.75rem; }
+.jev-json {
+  max-height: 24rem;
+  overflow: auto;
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+}
+
 footer {
   color: var(--muted);
   font-size: 0.85rem;

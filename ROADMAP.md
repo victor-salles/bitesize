@@ -17,7 +17,7 @@ The morning pipeline is in daily use: RSS → full text → AI filter/summarize/
 - **Scoring:** fallback stays below 70; cover and section leads prefer AI scores over length stand-ins; clustered AI batches get one listwise re-rank.
 - **Open-source hygiene:** MIT license, `SECURITY.md`, pytest + coverage + pip-audit + gitleaks CI, Dependabot, GitHub issue templates.
 
-The dashboard **Preview** tab now loads live headlines per source. Still missing: last-digest preview, AI summary preview, magazine cover preview.
+The dashboard **Preview** tab now loads live headlines per source. **Jev** tab lists each classify run and the JSON file under `output/jev/`. Still missing: last-digest preview, AI summary preview, magazine cover preview.
 
 ## Next
 

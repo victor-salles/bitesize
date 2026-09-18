@@ -10,6 +10,7 @@ from flask import Flask, jsonify, request, send_from_directory
 
 import settings_store as store
 from config import BASE_DIR, load_env, reload_settings
+import jev_log
 from kindle import send_test_email
 from preview import PREVIEW_FETCH_LIMIT, build_source_preview
 
@@ -161,6 +162,19 @@ def put_feed(feed_id: int):
 def delete_feed(feed_id: int):
     store.delete_feed(feed_id)
     return jsonify({"ok": True})
+
+
+@app.get("/api/jev/runs")
+def list_jev_runs():
+    return jsonify({"runs": jev_log.list_runs()})
+
+
+@app.get("/api/jev/runs/<run_id>")
+def get_jev_run(run_id: str):
+    payload = jev_log.load_run(run_id)
+    if payload is None:
+        return jsonify({"error": "Run not found"}), 404
+    return jsonify(payload)
 
 
 @app.post("/api/kindle/test")

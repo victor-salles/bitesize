@@ -6,7 +6,8 @@ import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable
 
-from config import get_settings
+from config import console, get_settings
+from jev_log import write_run
 from jev_policy import judgment_from_answers
 from jev_questions import TEMA_NOULS, article_state, news_questions
 from tags import normalize_tags
@@ -33,29 +34,47 @@ def flatten_response(response: Any) -> dict[str, Any]:
     temas = {}
     for qid, tema in TEMA_NOULS.items():
         temas[tema] = float(response.nouls[qid].noul)
+    relevance = response.scores["relevance"]
+    tipo = response.choices["tipo"]
+    usage = getattr(response, "usage", None)
+    usage_payload = None
+    if usage is not None:
+        usage_payload = {
+            "input_tokens": getattr(usage, "input_tokens", None),
+            "output_tokens": getattr(usage, "output_tokens", None),
+        }
+    probs = getattr(tipo, "probabilities", None)
+    if probs is not None and not isinstance(probs, dict):
+        try:
+            probs = dict(probs)
+        except (TypeError, ValueError):
+            probs = None
     return {
         "ad": float(response.nouls["ad"].noul),
         "keep": float(response.nouls["keep"].noul),
         "clickbait": float(response.nouls["clickbait"].noul),
         "press_release": float(response.nouls["press_release"].noul),
         "paywall_teaser": float(response.nouls["paywall_teaser"].noul),
-        "relevance": float(response.scores["relevance"].score),
-        "tipo": response.choices["tipo"].choice,
+        "relevance": float(relevance.score),
+        "relevance_confidence": float(getattr(relevance, "confidence", 0) or 0),
+        "tipo": tipo.choice,
+        "tipo_probabilities": probs,
         "temas": temas,
+        "model": getattr(response, "model", None),
+        "usage": usage_payload,
     }
 
 
-def apply_judgment(art: dict, judgment: dict[str, Any]) -> dict:
+def apply_judgment(
+    art: dict,
+    judgment: dict[str, Any],
+    *,
+    answers: dict[str, Any] | None = None,
+) -> dict:
     out = art.copy()
     out["skip"] = judgment["skip"]
     out["skip_reason"] = judgment.get("skip_reason")
-    out["jev"] = {
-        "keep": judgment.get("keep"),
-        "ad": judgment.get("ad"),
-        "clickbait": judgment.get("clickbait"),
-        "press_release": judgment.get("press_release"),
-        "paywall_teaser": judgment.get("paywall_teaser"),
-    }
+    out["jev"] = {"answers": answers or {}, "judgment": judgment}
     if judgment["skip"]:
         return out
     out["relevance"] = judgment["relevance"]
@@ -79,14 +98,16 @@ def classify_article(
                 response = client.system_one(state=state, questions=questions)
         else:
             response = system_one(state=state, questions=questions)
+        answers = flatten_response(response)
         judgment = judgment_from_answers(
-            flatten_response(response),
+            answers,
             min_keep=get_settings().jev_min_keep,
         )
-        return apply_judgment(art, judgment)
-    except Exception:
+        return apply_judgment(art, judgment, answers=answers)
+    except Exception as exc:
         out = art.copy()
         out["skip"] = False
+        out["jev_error"] = f"{type(exc).__name__}: {exc}"
         return out
 
 
@@ -108,4 +129,11 @@ def classify_articles(
         for fut in as_completed(futures):
             i, classified = fut.result()
             out[i] = classified
-    return [row for row in out if row is not None]
+    rows = [row for row in out if row is not None]
+    settings = get_settings()
+    run = write_run(rows, min_keep=settings.jev_min_keep, workers=workers)
+    console.print(
+        f"  Jev run saved: {run['path']} "
+        f"({run['kept']} kept, {run['skipped']} skipped, {run['errors']} errors)"
+    )
+    return rows

@@ -259,6 +259,7 @@ async function refreshSources() {
 }
 
 let previewLoaded = false;
+let jevLoaded = false;
 
 $$(".tab").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -269,6 +270,10 @@ $$(".tab").forEach((btn) => {
     if (btn.dataset.tab === "preview" && !previewLoaded) {
       previewLoaded = true;
       loadPreview();
+    }
+    if (btn.dataset.tab === "jev" && !jevLoaded) {
+      jevLoaded = true;
+      loadJevRuns();
     }
   });
 });
@@ -424,6 +429,134 @@ function renderPreview(data) {
 }
 
 $("#refresh-preview").onclick = loadPreview;
+
+async function loadJevRuns() {
+  const status = $("#jev-status");
+  const list = $("#jev-run-list");
+  const detail = $("#jev-run-detail");
+  detail.innerHTML = "";
+  setStatus(status, "Loading Jev runs…", true);
+  try {
+    const data = await api("/api/jev/runs");
+    renderJevRunList(data.runs || []);
+    const n = (data.runs || []).length;
+    setStatus(
+      status,
+      n ? `${n} run${n === 1 ? "" : "s"} on disk.` : "No Jev runs yet. They appear after a digest with Jev on.",
+      true,
+    );
+  } catch (e) {
+    list.innerHTML = "";
+    setStatus(status, e.message, false);
+  }
+}
+
+function renderJevRunList(runs) {
+  const root = $("#jev-run-list");
+  root.innerHTML = "";
+  for (const run of runs) {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "jev-run";
+    row.textContent = `${run.started_at || run.id} — ${run.kept} kept, ${run.skipped} skipped, ${run.errors} errors (${run.article_count} stories)`;
+    row.onclick = () => loadJevRun(run.id);
+    root.appendChild(row);
+  }
+}
+
+async function loadJevRun(runId) {
+  const status = $("#jev-status");
+  setStatus(status, `Loading ${runId}…`, true);
+  try {
+    const run = await api(`/api/jev/runs/${encodeURIComponent(runId)}`);
+    renderJevRunDetail(run);
+    setStatus(status, `Run ${run.id}. JSON: ${run.path}`, true);
+  } catch (e) {
+    $("#jev-run-detail").innerHTML = "";
+    setStatus(status, e.message, false);
+  }
+}
+
+function renderJevRunDetail(run) {
+  const root = $("#jev-run-detail");
+  root.innerHTML = "";
+  const card = document.createElement("div");
+  card.className = "card";
+  const meta = document.createElement("p");
+  meta.className = "jev-meta";
+  meta.textContent = `File: ${run.path}`;
+  card.appendChild(meta);
+  const table = document.createElement("table");
+  table.className = "jev-table";
+  const head = document.createElement("thead");
+  head.innerHTML = "<tr><th>Story</th><th>Skip</th><th>Rel</th><th>Keep</th><th>Ad</th><th>Tipo</th><th>Temas</th></tr>";
+  table.appendChild(head);
+  const body = document.createElement("tbody");
+  for (const item of run.items || []) {
+    const answers = (item.jev && item.jev.answers) || {};
+    const tr = document.createElement("tr");
+    if (item.skip) tr.className = "jev-skip";
+    if (item.error) tr.className = "jev-error";
+    const titleCell = document.createElement("td");
+    if (item.url) {
+      const a = document.createElement("a");
+      a.href = item.url;
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.textContent = item.title || "(no title)";
+      titleCell.appendChild(a);
+    } else {
+      titleCell.textContent = item.title || "(no title)";
+    }
+    const src = document.createElement("div");
+    src.className = "jev-source";
+    src.textContent = item.source || "";
+    titleCell.appendChild(src);
+    const skip = item.error ? `error: ${item.error}` : (item.skip ? (item.skip_reason || "yes") : "");
+    tr.append(
+      titleCell,
+      td(skip),
+      td(item.relevance == null ? "" : String(item.relevance)),
+      td(fmtScore(answers.keep)),
+      td(fmtScore(answers.ad)),
+      td(item.tipo || ""),
+      td((item.temas || []).join(", ")),
+    );
+    tr.onclick = (ev) => {
+      ev.preventDefault();
+      showJevJson(item);
+    };
+    body.appendChild(tr);
+  }
+  table.appendChild(body);
+  card.appendChild(table);
+  const pre = document.createElement("pre");
+  pre.id = "jev-json";
+  pre.className = "jev-json";
+  pre.textContent = "Click a row to see the full Jev JSON for that story.";
+  card.appendChild(pre);
+  root.appendChild(card);
+}
+
+function td(text) {
+  const el = document.createElement("td");
+  el.textContent = text;
+  return el;
+}
+
+function fmtScore(v) {
+  if (v == null || v === "") return "";
+  const n = Number(v);
+  if (Number.isNaN(n)) return String(v);
+  return n.toFixed(2);
+}
+
+function showJevJson(item) {
+  const pre = $("#jev-json");
+  if (pre) pre.textContent = JSON.stringify(item, null, 2);
+}
+
+$("#refresh-jev").onclick = loadJevRuns;
 
 loadSettings().then(refreshSources).catch((e) => {
   setStatus($("#settings-status"), e.message, false);

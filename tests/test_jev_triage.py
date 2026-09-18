@@ -3,10 +3,16 @@ from unittest.mock import MagicMock
 
 import pytest
 
+import jev_log
 import jev_triage
 from jev_questions import TEMA_NOULS, article_state
 
 pytestmark = pytest.mark.allow_jev
+
+
+@pytest.fixture(autouse=True)
+def jev_json_dir(tmp_path, monkeypatch):
+    monkeypatch.setattr(jev_log, "JEV_DIR", tmp_path / "jev")
 
 
 class FakeNoul:
@@ -77,6 +83,7 @@ def test_classify_article_skips_ads(monkeypatch):
     )
     assert out["skip"] is True
     assert out["skip_reason"] == "ad"
+    assert out["jev"]["answers"]["ad"] >= 0.9
 
 
 def test_classify_article_sets_relevance_and_temas(monkeypatch):
@@ -116,3 +123,8 @@ def test_classify_articles_keeps_order(monkeypatch):
         system_one=lambda **kwargs: _response(),
     )
     assert [a["title"] for a in out] == ["A", "B"]
+    listed = jev_log.list_runs()
+    assert len(listed) == 1
+    loaded = jev_log.load_run(listed[0]["id"])
+    assert [item["title"] for item in loaded["items"]] == ["A", "B"]
+    assert loaded["items"][0]["jev"]["answers"]["keep"] > 0

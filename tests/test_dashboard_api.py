@@ -100,6 +100,37 @@ def test_put_settings_requires_token(client):
     assert r.status_code == 200
 
 
+def test_jev_runs_api_lists_and_loads_json(client, tmp_path, monkeypatch):
+    import jev_log
+
+    monkeypatch.setattr(jev_log, "JEV_DIR", tmp_path / "jev")
+    jev_log.write_run(
+        [
+            {
+                "title": "Story",
+                "source": "G1",
+                "skip": False,
+                "relevance": 70,
+                "jev": {"answers": {"ad": 0.01, "keep": 0.8}},
+            }
+        ],
+        min_keep=0,
+        workers=2,
+    )
+    listed = client.get("/api/jev/runs")
+    assert listed.status_code == 200
+    runs = listed.get_json()["runs"]
+    assert len(runs) == 1
+    run_id = runs[0]["id"]
+    detail = client.get("/api/jev/runs/" + run_id)
+    assert detail.status_code == 200
+    body = detail.get_json()
+    assert body["items"][0]["title"] == "Story"
+    assert body["items"][0]["jev"]["answers"]["keep"] == 0.8
+    missing = client.get("/api/jev/runs/../secret")
+    assert missing.status_code == 404
+
+
 def test_resolve_dashboard_token_from_file(tmp_path, monkeypatch):
     token_file = tmp_path / "dashboard.token"
     token_file.write_text("file-token\n", encoding="utf-8")
