@@ -88,7 +88,7 @@ If no backend is available, the digest still runs — articles are kept with len
 
 **Jev (optional triage)**
 
-TypeSafe’s Jev scores ads, keep/drop, relevance, completeness, and Portuguese temas. Summaries and covers still use Antigravity / Gemini / Ollama. Put `TYPESAFE_API_KEY` in `.env`, then turn on `jev_triage_enabled` in the dashboard. Set `jev_min_keep` (for example `40`) to drop weak stories for a shorter Kindle book.
+TypeSafe’s Jev scores ads, compiled relevance (0–100 from your ranked topics), completeness, and Portuguese temas. Summaries and covers still use Antigravity / Gemini / Ollama. Put `TYPESAFE_API_KEY` in `.env`, then turn on `jev_triage_enabled` in the dashboard. Set `jev_min_keep` to a minimum compiled relevance (for example `40` on the 0–100 scale) to drop weak stories for a shorter Kindle book.
 
 ### 4. Kindle delivery (optional)
 

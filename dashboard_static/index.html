@@ -12,7 +12,13 @@
 </head>
 <body>
   <header>
-    <h1>BiteSIze</h1>
+    <div class="flex flex-wrap items-center gap-3">
+      <h1 class="m-0">BiteSIze</h1>
+      <div id="ui-lang-switch" class="inline-flex rounded-md border border-slate-200 overflow-hidden text-xs" role="group" aria-label="UI language">
+        <button type="button" data-ui-lang="en" class="ui-lang-btn px-2 py-1 bg-white text-slate-600 hover:bg-slate-50">En</button>
+        <button type="button" data-ui-lang="pt" class="ui-lang-btn px-2 py-1 bg-white text-slate-600 hover:bg-slate-50 border-l border-slate-200">Pt</button>
+      </div>
+    </div>
     <p class="subtitle">Settings dashboard — changes apply to the CLI immediately</p>
     <div class="field token-field">
       <label for="dashboard-token">Write API token</label>

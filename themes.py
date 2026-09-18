@@ -165,10 +165,9 @@ def compiled_relevance(
     if not ids:
         return 0
     n = len(ids)
-    total_w = 0.0
+    max_w = float(n)
     acc = 0.0
     for i, tid in enumerate(ids):
         w = n - i
-        total_w += w
         acc += float(tema_scores.get(tid) or 0) * w
-    return max(0, min(100, int(round(100 * acc / total_w))))
+    return max(0, min(100, int(round(100 * acc / max_w))))

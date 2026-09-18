@@ -97,6 +97,7 @@ def test_compiled_relevance_prefers_high_rank_theme():
     high_sport = compiled_relevance({"economia": 0.0, "esportes": 1.0}, ranked)
     assert high_econ > high_sport
     assert 0 <= high_econ <= 100
+    assert compiled_relevance({"economia": 1.0}, ranked) == 100
 
 
 def test_compiled_relevance_missing_theme_is_zero():
@@ -148,6 +149,6 @@ def test_replace_themes_slug_new_id_from_label(themes_db):
 
 
 def test_default_theme_ids_match_legacy_temas():
-    from tags import TEMAS
+    from tags import _default_tema_ids
 
-    assert {t["id"] for t in DEFAULT_THEMES} == set(TEMAS)
+    assert {t["id"] for t in DEFAULT_THEMES} == _default_tema_ids()

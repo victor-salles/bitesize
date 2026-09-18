@@ -216,11 +216,45 @@ function collectInputs(container) {
   return out;
 }
 
+function paintLangSwitcher() {
+  const current = uiLang();
+  $$("#ui-lang-switch [data-ui-lang]").forEach((btn) => {
+    const on = btn.dataset.uiLang === current;
+    btn.classList.toggle("ring-2", on);
+    btn.classList.toggle("ring-slate-400", on);
+    btn.classList.toggle("font-semibold", on);
+  });
+}
+
+function setUiLang(lang, { persist = false } = {}) {
+  uiLangCode = lang === "pt" ? "pt" : "en";
+  if (persist) localStorage.setItem(LANG_KEY, uiLangCode);
+  applyStaticI18n();
+  paintLangSwitcher();
+  if (jevThemesDraft.length) renderJevThemeEditor();
+  if (jevOpenRun) {
+    const snap = { ...jevFilter };
+    renderJevRunDetail(jevOpenRun);
+    for (const [sel, val] of [
+      ["#jev-q", snap.q],
+      ["#jev-source", snap.source],
+      ["#jev-tipo", snap.tipo],
+      ["#jev-tema", snap.tema],
+      ["#jev-skip", snap.skip],
+      ["#jev-group", snap.group],
+    ]) {
+      const el = $(sel);
+      if (el && val != null) el.value = val;
+    }
+    readJevFilters();
+  }
+}
+
 async function loadSettings() {
   settingsData = await api("/api/settings");
-  const lang = uiLang();
-  if (lang) localStorage.setItem(LANG_KEY, lang);
+  uiLangCode = uiLang();
   applyStaticI18n();
+  paintLangSwitcher();
   renderSettingsGroups();
   renderKindleFields();
 }
@@ -751,7 +785,8 @@ function themeScoresCell(item, run) {
 
 function temaEditor(item, i) {
   const on = new Set(shownTemas(item));
-  const ids = Object.keys(TEMA_PILL);
+  const catalog = (jevOpenRun?.themes || []).filter((th) => th.enabled);
+  const ids = catalog.length ? catalog.map((th) => th.id) : Object.keys(TEMA_PILL);
   return `<div class="flex flex-wrap gap-1 max-w-xs mt-1">${ids
     .map((tid) => {
       const active = on.has(tid);
@@ -881,7 +916,7 @@ function groupHeaderHtml(key, members) {
     <td colspan="6" class="px-4 py-5">
       <span class="inline-flex items-center gap-2 text-sm font-semibold tracking-wide text-slate-700">
         <span class="w-4 text-slate-400">${chev}</span>
-        ${esc(key)}
+        ${esc(groupDisplayLabel(key))}
         <span class="rounded-md bg-white px-2 py-0.5 text-xs font-medium text-slate-500">${members.length}</span>
       </span>
     </td>
@@ -960,7 +995,7 @@ function renderJevRunList(runs) {
 
 async function loadJevRun(runId) {
   const status = $("#jev-status");
-  setStatus(status, `Loading ${runId}…`, true);
+  setStatus(status, t("loadingRun", { runId }), true);
   try {
     const run = await api(`/api/jev/runs/${encodeURIComponent(runId)}`);
     jevSelectedIndex = -1;
@@ -994,6 +1029,26 @@ function optionList(values, emptyLabel) {
     .join("");
 }
 
+function themeFilterOptions(ids, run) {
+  return [`<option value="">${esc(t("allThemes"))}</option>`]
+    .concat(
+      ids.map(
+        (id) =>
+          `<option value="${esc(id)}">${esc(themeLabel(id, run))}</option>`,
+      ),
+    )
+    .join("");
+}
+
+function groupDisplayLabel(key) {
+  if (jevFilter.group === "tema") return themeLabel(key, jevOpenRun);
+  if (jevFilter.group === "tipo") {
+    if (key === "artigo-completo") return t("tipoCompleto");
+    if (key === "resumo") return t("tipoResumo");
+  }
+  return key;
+}
+
 function renderJevRunDetail(run) {
   jevOpenRun = run;
   const root = $("#jev-run-detail");
@@ -1019,7 +1074,7 @@ function renderJevRunDetail(run) {
             <option value="artigo-completo">${esc(t("tipoCompleto"))}</option>
             <option value="resumo">${esc(t("tipoResumo"))}</option>
           </select>
-          <select id="jev-tema" class="rounded-md border border-slate-200 px-2 py-1.5 text-xs">${optionList(temas, t("allThemes"))}</select>
+          <select id="jev-tema" class="rounded-md border border-slate-200 px-2 py-1.5 text-xs">${themeFilterOptions(temas, run)}</select>
           <select id="jev-skip" class="rounded-md border border-slate-200 px-2 py-1.5 text-xs">
             <option value="">${esc(t("keptAndSkipped"))}</option>
             <option value="kept">${esc(t("keptOnly"))}</option>
@@ -1099,10 +1154,10 @@ function renderJevRunDetail(run) {
         return;
       }
       if (field === "tema") {
-        const t = labelEl.dataset.value;
+        const temaId = labelEl.dataset.value;
         const current = new Set(shownTemas(item));
-        if (current.has(t)) current.delete(t);
-        else current.add(t);
+        if (current.has(temaId)) current.delete(temaId);
+        else current.add(temaId);
         persistJevLabel(index, { temas: [...current] }).catch((e) => setStatus($("#jev-status"), e.message, false));
       }
       return;
@@ -1205,6 +1260,10 @@ $("#export-jev-labels").onclick = async () => {
     setStatus(status, e.message, false);
   }
 };
+
+$$("#ui-lang-switch [data-ui-lang]").forEach((btn) => {
+  btn.addEventListener("click", () => setUiLang(btn.dataset.uiLang, { persist: true }));
+});
 
 loadSettings().then(refreshSources).catch((e) => {
   setStatus($("#settings-status"), e.message, false);

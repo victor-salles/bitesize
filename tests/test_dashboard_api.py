@@ -254,6 +254,12 @@ def test_jev_themes_put_requires_token(client):
     assert r.status_code == 401
 
 
+def test_jev_themes_put_rejects_empty_list(client):
+    auth = {"Authorization": "Bearer test-token"}
+    r = client.put("/api/jev/themes", json=[], headers=auth)
+    assert r.status_code == 400
+
+
 def test_jev_themes_put_reorder_persists(client):
     auth = {"Authorization": "Bearer test-token"}
     listed = client.get("/api/jev/themes").get_json()["themes"]

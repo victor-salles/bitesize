@@ -243,7 +243,7 @@ def process_articles(articles: list[dict], batch_size: int | None = None) -> lis
 
 def _process_articles_jev(articles: list[dict], batch_size: int) -> list[dict]:
     """Jev decides skip/relevance/tags; the writing model still writes summaries."""
-    console.print("  Jev triage (ads, keep, relevance, temas)…")
+    console.print("  Jev triage (ads, relevance, temas)…")
     classified = jev_triage.classify_articles(articles)
     kept: list[dict] = []
     for art in classified:

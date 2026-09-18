@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from config import BASE_DIR
-from tags import TEMAS, TIPOS
+from tags import TIPOS, _enabled_tema_ids
 
 LABELS_PATH = BASE_DIR / "data" / "jev_labels.json"
 
@@ -62,7 +62,8 @@ def _clean_patch(patch: dict[str, Any]) -> dict[str, Any]:
     if "tipo" in patch and patch["tipo"] in TIPOS:
         out["tipo"] = patch["tipo"]
     if "temas" in patch and isinstance(patch["temas"], list):
-        out["temas"] = sorted({t for t in patch["temas"] if t in TEMAS})
+        allowed = _enabled_tema_ids()
+        out["temas"] = sorted({t for t in patch["temas"] if t in allowed})
     return out
 
 

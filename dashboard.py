@@ -176,6 +176,8 @@ def put_jev_themes():
     data = request.get_json(silent=True)
     if not isinstance(data, list):
         return jsonify({"error": "Expected JSON array"}), 400
+    if not data:
+        return jsonify({"error": "themes array must not be empty"}), 400
     try:
         themes = replace_themes(data)
     except ValueError as e:
@@ -217,7 +219,6 @@ def save_jev_label():
     patch = {
         k: data[k]
         for k in (
-            "keep",
             "ad",
             "clickbait",
             "press_release",
