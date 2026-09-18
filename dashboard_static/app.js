@@ -260,6 +260,8 @@ async function refreshSources() {
 
 let previewLoaded = false;
 let jevLoaded = false;
+let jevOpenRun = null;
+let jevSelectedIndex = -1;
 
 $$(".tab").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -267,6 +269,7 @@ $$(".tab").forEach((btn) => {
     $$(".panel").forEach((p) => p.classList.remove("active"));
     btn.classList.add("active");
     $(`#panel-${btn.dataset.tab}`).classList.add("active");
+    document.body.classList.toggle("jev-wide", btn.dataset.tab === "jev");
     if (btn.dataset.tab === "preview" && !previewLoaded) {
       previewLoaded = true;
       loadPreview();
@@ -451,14 +454,52 @@ async function loadJevRuns() {
   }
 }
 
+function esc(s) {
+  return String(s ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function pct(v) {
+  if (v == null || v === "") return "—";
+  const n = Number(v);
+  if (Number.isNaN(n)) return "—";
+  return `${Math.round(n * 100)}%`;
+}
+
+function tipoPill(tipo) {
+  if (tipo === "artigo-completo") {
+    return '<span class="inline-flex rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">completo</span>';
+  }
+  if (tipo === "resumo") {
+    return '<span class="inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">resumo</span>';
+  }
+  return '<span class="text-xs text-slate-400">—</span>';
+}
+
+function skipCell(item) {
+  if (item.error) {
+    return `<span class="text-xs font-medium text-red-600">${esc(item.error)}</span>`;
+  }
+  if (item.skip) {
+    return `<span class="text-xs font-medium text-slate-500">${esc(item.skip_reason || "skip")}</span>`;
+  }
+  return '<span class="text-xs text-slate-300">—</span>';
+}
+
 function renderJevRunList(runs) {
   const root = $("#jev-run-list");
+  root.className = "flex flex-wrap gap-2 mb-4";
   root.innerHTML = "";
   for (const run of runs) {
     const row = document.createElement("button");
     row.type = "button";
-    row.className = "jev-run";
-    row.textContent = `${run.started_at || run.id} — ${run.kept} kept, ${run.skipped} skipped, ${run.errors} errors (${run.article_count} stories)`;
+    row.className =
+      "rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm text-slate-700 shadow-sm hover:border-slate-300";
+    row.innerHTML = `<span class="block font-medium">${esc(run.started_at || run.id)}</span>
+      <span class="block text-xs text-slate-400">${run.article_count} stories · ${run.kept} kept · ${run.skipped} skipped</span>`;
     row.onclick = () => loadJevRun(run.id);
     root.appendChild(row);
   }
@@ -469,86 +510,115 @@ async function loadJevRun(runId) {
   setStatus(status, `Loading ${runId}…`, true);
   try {
     const run = await api(`/api/jev/runs/${encodeURIComponent(runId)}`);
+    jevSelectedIndex = -1;
     renderJevRunDetail(run);
-    setStatus(status, `Run ${run.id}. JSON: ${run.path}`, true);
+    setStatus(status, `${run.article_count} stories in ${run.id}`, true);
   } catch (e) {
     $("#jev-run-detail").innerHTML = "";
     setStatus(status, e.message, false);
   }
 }
 
-function renderJevRunDetail(run) {
-  const root = $("#jev-run-detail");
-  root.innerHTML = "";
-  const card = document.createElement("div");
-  card.className = "card";
-  const meta = document.createElement("p");
-  meta.className = "jev-meta";
-  meta.textContent = `File: ${run.path}`;
-  card.appendChild(meta);
-  const table = document.createElement("table");
-  table.className = "jev-table";
-  const head = document.createElement("thead");
-  head.innerHTML = "<tr><th>Story</th><th>Skip</th><th>Rel</th><th>Keep</th><th>Ad</th><th>Tipo</th><th>Temas</th></tr>";
-  table.appendChild(head);
-  const body = document.createElement("tbody");
+function jevTokenTotals(run) {
+  let inn = 0;
+  let out = 0;
   for (const item of run.items || []) {
-    const answers = (item.jev && item.jev.answers) || {};
-    const tr = document.createElement("tr");
-    if (item.skip) tr.className = "jev-skip";
-    if (item.error) tr.className = "jev-error";
-    const titleCell = document.createElement("td");
-    if (item.url) {
-      const a = document.createElement("a");
-      a.href = item.url;
-      a.target = "_blank";
-      a.rel = "noopener";
-      a.textContent = item.title || "(no title)";
-      titleCell.appendChild(a);
-    } else {
-      titleCell.textContent = item.title || "(no title)";
-    }
-    const src = document.createElement("div");
-    src.className = "jev-source";
-    src.textContent = item.source || "";
-    titleCell.appendChild(src);
-    const skip = item.error ? `error: ${item.error}` : (item.skip ? (item.skip_reason || "yes") : "");
-    tr.append(
-      titleCell,
-      td(skip),
-      td(item.relevance == null ? "" : String(item.relevance)),
-      td(fmtScore(answers.keep)),
-      td(fmtScore(answers.ad)),
-      td(item.tipo || ""),
-      td((item.temas || []).join(", ")),
-    );
-    tr.onclick = (ev) => {
-      ev.preventDefault();
-      showJevJson(item);
-    };
-    body.appendChild(tr);
+    const u = item.jev?.answers?.usage;
+    if (!u) continue;
+    inn += Number(u.input_tokens) || 0;
+    out += Number(u.output_tokens) || 0;
   }
-  table.appendChild(body);
-  card.appendChild(table);
-  const pre = document.createElement("pre");
-  pre.id = "jev-json";
-  pre.className = "jev-json";
-  pre.textContent = "Click a row to see the full Jev JSON for that story.";
-  card.appendChild(pre);
-  root.appendChild(card);
+  return { inn, out };
 }
 
-function td(text) {
-  const el = document.createElement("td");
-  el.textContent = text;
-  return el;
-}
+function renderJevRunDetail(run) {
+  jevOpenRun = run;
+  const root = $("#jev-run-detail");
+  const items = run.items || [];
+  const tokens = jevTokenTotals(run);
+  const keptPct = run.article_count
+    ? Math.round((run.kept / run.article_count) * 1000) / 10
+    : 0;
+  const rows = items
+    .map((item, i) => {
+      const answers = item.jev?.answers || {};
+      const title = esc(item.title || "(no title)");
+      const href = item.url ? esc(item.url) : "";
+      const titleHtml = href
+        ? `<a class="text-slate-900 hover:underline" href="${href}" target="_blank" rel="noopener">${title}</a>`
+        : title;
+      const selected = i === jevSelectedIndex ? "bg-slate-50" : "";
+      return `<tr data-jev-i="${i}" class="border-b border-slate-100 cursor-pointer hover:bg-slate-50 ${selected}">
+        <td class="py-3 pr-4">
+          <div class="text-sm leading-snug">${titleHtml}</div>
+          <div class="text-xs text-slate-400 mt-0.5">${esc(item.source || "")}</div>
+        </td>
+        <td class="py-3 px-2 text-sm text-slate-500 whitespace-nowrap">${esc((item.temas || []).join(", ") || "—")}</td>
+        <td class="py-3 px-2 whitespace-nowrap">${tipoPill(item.tipo)}</td>
+        <td class="py-3 px-2 text-sm text-slate-600 text-right">${item.relevance == null ? "—" : esc(item.relevance)}</td>
+        <td class="py-3 px-2 text-sm text-slate-600 text-right">${pct(answers.keep)}</td>
+        <td class="py-3 px-2 text-sm text-slate-600 text-right">${pct(answers.ad)}</td>
+        <td class="py-3 pl-2">${skipCell(item)}</td>
+      </tr>`;
+    })
+    .join("");
 
-function fmtScore(v) {
-  if (v == null || v === "") return "";
-  const n = Number(v);
-  if (Number.isNaN(n)) return String(v);
-  return n.toFixed(2);
+  root.innerHTML = `
+    <div class="flex flex-col lg:flex-row gap-6 items-start">
+      <div class="flex-1 min-w-0 bg-white rounded-xl border border-slate-200 overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left text-xs font-medium text-slate-400 border-b border-slate-200">
+              <th class="py-2.5 px-4 font-medium">Story</th>
+              <th class="py-2.5 px-2 font-medium">Temas</th>
+              <th class="py-2.5 px-2 font-medium">Tipo</th>
+              <th class="py-2.5 px-2 font-medium text-right">Rel</th>
+              <th class="py-2.5 px-2 font-medium text-right">Keep</th>
+              <th class="py-2.5 px-2 font-medium text-right">Ad</th>
+              <th class="py-2.5 px-4 font-medium">Skip</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <aside class="w-full lg:w-72 shrink-0 rounded-xl border border-slate-200 bg-white p-4 sticky top-4">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold text-slate-800 m-0">Run</h2>
+          <span class="text-xs text-emerald-700">${run.errors ? run.errors + " failed" : "Complete"}</span>
+        </div>
+        <p class="text-[11px] text-slate-400 break-all mb-3">${esc(run.path || "")}</p>
+        <div class="grid grid-cols-2 gap-y-2 text-sm mb-3">
+          <span class="text-slate-400">Stories</span><span class="text-right font-medium">${run.article_count}</span>
+          <span class="text-slate-400">Kept</span><span class="text-right font-medium">${run.kept}</span>
+          <span class="text-slate-400">Skipped</span><span class="text-right font-medium">${run.skipped}</span>
+          <span class="text-slate-400">Workers</span><span class="text-right font-medium">${run.workers ?? "—"}</span>
+          <span class="text-slate-400">Min keep</span><span class="text-right font-medium">${run.min_keep ?? 0}</span>
+        </div>
+        <div class="mb-1 flex justify-between text-xs text-slate-500">
+          <span>Kept</span><span>${keptPct}%</span>
+        </div>
+        <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden mb-4">
+          <div class="h-full bg-emerald-600" style="width:${keptPct}%"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-y-1 text-sm mb-4">
+          <span class="text-slate-400">Tokens in</span><span class="text-right">${tokens.inn.toLocaleString()}</span>
+          <span class="text-slate-400">Tokens out</span><span class="text-right">${tokens.out.toLocaleString()}</span>
+        </div>
+        <pre id="jev-json" class="text-[11px] leading-snug text-slate-600 bg-slate-50 rounded-lg p-3 max-h-64 overflow-auto whitespace-pre-wrap m-0">Click a row for that story’s JSON.</pre>
+      </aside>
+    </div>`;
+
+  root.onclick = (ev) => {
+    const tr = ev.target.closest("[data-jev-i]");
+    if (!tr || !jevOpenRun) return;
+    ev.preventDefault();
+    jevSelectedIndex = Number(tr.dataset.jevI);
+    const item = jevOpenRun.items[jevSelectedIndex];
+    showJevJson(item);
+    root.querySelectorAll("[data-jev-i]").forEach((row) => {
+      row.classList.toggle("bg-slate-50", row === tr);
+    });
+  };
 }
 
 function showJevJson(item) {
