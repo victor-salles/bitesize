@@ -9,7 +9,8 @@ from typing import Any, Callable
 from config import console, get_settings
 from jev_log import write_run
 from jev_policy import judgment_from_answers
-from jev_questions import TEMA_NOULS, article_state, news_questions
+from jev_questions import article_state, news_questions, tema_nouls
+from themes import list_themes
 from tags import normalize_tags
 
 MAX_WORKERS = 32
@@ -32,9 +33,8 @@ def worker_count(raw: int | None = None) -> int:
 
 def flatten_response(response: Any) -> dict[str, Any]:
     temas = {}
-    for qid, tema in TEMA_NOULS.items():
+    for qid, tema in tema_nouls().items():
         temas[tema] = float(response.nouls[qid].noul)
-    relevance = response.scores["relevance"]
     tipo = response.choices["tipo"]
     usage = getattr(response, "usage", None)
     usage_payload = None
@@ -51,12 +51,9 @@ def flatten_response(response: Any) -> dict[str, Any]:
             probs = None
     return {
         "ad": float(response.nouls["ad"].noul),
-        "keep": float(response.nouls["keep"].noul),
         "clickbait": float(response.nouls["clickbait"].noul),
         "press_release": float(response.nouls["press_release"].noul),
         "paywall_teaser": float(response.nouls["paywall_teaser"].noul),
-        "relevance": float(relevance.score),
-        "relevance_confidence": float(getattr(relevance, "confidence", 0) or 0),
         "tipo": tipo.choice,
         "tipo_probabilities": probs,
         "temas": temas,
@@ -99,9 +96,11 @@ def classify_article(
         else:
             response = system_one(state=state, questions=questions)
         answers = flatten_response(response)
+        ranked_ids = [t["id"] for t in list_themes() if t["enabled"]]
         judgment = judgment_from_answers(
             answers,
             min_keep=get_settings().jev_min_keep,
+            ranked_ids=ranked_ids,
         )
         return apply_judgment(art, judgment, answers=answers)
     except Exception as exc:

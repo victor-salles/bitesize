@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from tags import TEMAS, TIPOS
-
-RELEVANCE_LEVELS = 5  # Score criteria 0..4
+from tags import TIPOS
+from themes import compiled_relevance
 
 THRESHOLDS = {
     "ad_skip": 0.65,
@@ -19,24 +18,14 @@ THRESHOLDS = {
 }
 
 
-def relevance_int(score: float) -> int:
-    """Map a 0..(levels-1) Score onto 0–100."""
-    span = RELEVANCE_LEVELS - 1
-    try:
-        raw = float(score)
-    except (TypeError, ValueError):
-        return 50
-    return max(0, min(100, int(round(raw / span * 100))))
-
-
 def judgment_from_answers(
     answers: dict[str, Any],
     *,
     min_keep: int = 0,
+    ranked_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Map one System One answer dict to skip / relevance / tipo / temas."""
     ad = float(answers.get("ad") or 0)
-    keep = float(answers.get("keep") or 0)
     clickbait = float(answers.get("clickbait") or 0)
     press = float(answers.get("press_release") or 0)
     paywall = float(answers.get("paywall_teaser") or 0)
@@ -48,22 +37,23 @@ def judgment_from_answers(
             "relevance": 0,
             "tipo": "resumo",
             "temas": [],
-            "keep": keep,
             "ad": ad,
         }
 
-    if min_keep > 0 and keep * 100 < min_keep:
+    raw_temas = answers.get("temas") or {}
+    ids = list(ranked_ids or [])
+    relevance = compiled_relevance(raw_temas, ids)
+
+    if min_keep > 0 and relevance < min_keep:
         return {
             "skip": True,
             "skip_reason": "weak",
             "relevance": 0,
             "tipo": "resumo",
             "temas": [],
-            "keep": keep,
             "ad": ad,
         }
 
-    relevance = relevance_int(answers.get("relevance", 0))
     if clickbait >= THRESHOLDS["clickbait_penalty"]:
         relevance = max(0, relevance - THRESHOLDS["clickbait_delta"])
     if press >= THRESHOLDS["press_release_penalty"]:
@@ -75,10 +65,10 @@ def judgment_from_answers(
     if paywall >= THRESHOLDS["paywall_tipo"]:
         tipo = "resumo"
 
-    raw_temas = answers.get("temas") or {}
+    tema_pool = ids if ids else list(raw_temas.keys())
     temas = sorted(
         t
-        for t in TEMAS
+        for t in tema_pool
         if float(raw_temas.get(t) or 0) >= THRESHOLDS["tema_apply"]
     )
 
@@ -88,7 +78,6 @@ def judgment_from_answers(
         "relevance": relevance,
         "tipo": tipo,
         "temas": temas,
-        "keep": keep,
         "ad": ad,
         "clickbait": clickbait,
         "press_release": press,

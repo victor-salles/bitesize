@@ -2,46 +2,40 @@
 
 from __future__ import annotations
 
-from typesafe_sdk import Choice, Noul, Score
+from typesafe_sdk import Choice, Noul
 
-from tags import TEMAS, TIPOS
+from tags import TIPOS
 
-READER_NOTES = (
-    "The reader is Victor. The digest is a short morning Kindle magazine in Portuguese. "
-    "Feeds are already chosen; judge the story itself. "
-    "Do not treat `category` as a topic tag — that is only the feed folder."
-)
+SNIPPET_CHARS = 480
 
-TEMA_NOULS = {f"tema_{t}": t for t in sorted(TEMAS)}
 
-RELEVANCE_CRITERIA = [
-    "Filler: no public impact, leftover promo, or a story nobody needs this morning.",
-    "Niche: real news, but only a small audience or a follow-up of little consequence.",
-    "Solid: belongs in this section of a daily paper.",
-    "Important today: national or international impact, or a story most readers will expect.",
-    "Lead: the kind of story that would open a newspaper.",
-]
+def tema_nouls() -> dict[str, str]:
+    from themes import list_themes
+
+    return {f"tema_{t['id']}": t["id"] for t in list_themes() if t["enabled"]}
 
 
 def article_state(art: dict) -> dict:
-    body = (art.get("content") or art.get("rss_snippet") or "").strip()
-    if len(body) > 8000:
-        body = body[:8000]
+    raw = (art.get("content") or art.get("rss_snippet") or "").strip()
+    snippet = raw[:SNIPPET_CHARS]
+    if len(raw) > SNIPPET_CHARS:
+        cut = snippet.rfind(" ")
+        if cut >= SNIPPET_CHARS // 2:
+            snippet = snippet[:cut]
     return {
-        "reader": READER_NOTES,
         "title": art.get("title") or "",
         "source": art.get("source") or "",
-        "category": art.get("category") or "",
-        "url": art.get("link") or art.get("url") or "",
-        "body": body,
+        "snippet": snippet.strip(),
+        "body_chars": len(raw),
     }
 
 
 def news_questions() -> dict:
+    tema_map = tema_nouls()
     questions: dict = {
         "ad": Noul(
             instructions=(
-                "Is `title` plus `body` a pure advertisement, advertorial, "
+                "Is `title` plus `snippet` a pure advertisement, advertorial, "
                 "sponsored post, or affiliate pitch rather than journalism?"
             ),
             criteria={
@@ -49,20 +43,9 @@ def news_questions() -> dict:
                 "false": "It is reporting, analysis, or opinion journalism, even if a company is mentioned.",
             },
         ),
-        "keep": Noul(
-            instructions=(
-                "Would this story earn a slot in a short Kindle morning edition "
-                "for a Brazilian reader who already has too many articles? "
-                "Use `title` and `body`. Prefer impact, timeliness, and breadth."
-            ),
-            criteria={
-                "true": "Worth keeping if the book must stay small.",
-                "false": "Skip when space is tight: thin, local-only, duplicate-feeling, or low-stakes.",
-            },
-        ),
         "clickbait": Noul(
             instructions=(
-                "Does `title` oversell or withhold what `body` actually delivers?"
+                "Does `title` oversell or withhold what `snippet` actually delivers?"
             ),
             criteria={
                 "true": "Clickbait, curiosity-gap, or a headline that does not match the facts.",
@@ -71,7 +54,7 @@ def news_questions() -> dict:
         ),
         "press_release": Noul(
             instructions=(
-                "Is `body` mostly a company or government press release, lightly rewritten?"
+                "Is `snippet` mostly a company or government press release, lightly rewritten?"
             ),
             criteria={
                 "true": "PR copy, product launch fluff, or an official statement with no reporting.",
@@ -80,25 +63,18 @@ def news_questions() -> dict:
         ),
         "paywall_teaser": Noul(
             instructions=(
-                "Is `body` a paywall teaser, subscribe wall, or lede-only fragment, "
-                "not a full article?"
+                "Is this a paywall teaser, subscribe wall, or lede-only fragment? "
+                "Use `snippet` and `body_chars`, not a full article."
             ),
             criteria={
                 "true": "Too little body to read; subscribe/paywall language or a snippet echo.",
                 "false": "There is enough article text to read on a Kindle.",
             },
         ),
-        "relevance": Score(
-            instructions=(
-                "How important is this story for today's digest, given `title` and `body`? "
-                "Compare against a typical morning newspaper, not against other items in a batch."
-            ),
-            criteria=RELEVANCE_CRITERIA,
-        ),
         "tipo": Choice(
             instructions=(
-                "Given `body`, is this a short teaser (`resumo`) or enough text to read "
-                "(`artigo-completo`)? Ignore `category`."
+                "Given `snippet` and `body_chars`, is this a short teaser (`resumo`) or enough text to read "
+                "(`artigo-completo`)? Ignore feed folders."
             ),
             criteria={
                 "resumo": "Paywall teaser, lede-only, or too short to read as an article.",
@@ -106,11 +82,11 @@ def news_questions() -> dict:
             },
         ),
     }
-    for qid, tema in TEMA_NOULS.items():
+    for qid, tema in tema_map.items():
         questions[qid] = Noul(
             instructions=(
                 f"Should this story be tagged `{tema}` in Portuguese topic tags? "
-                "Use `title` and `body`. Multiple tags may be true."
+                "Use `title` and `snippet`. Multiple tags may be true."
             ),
             criteria={
                 "true": f"The story is substantially about {tema}.",
@@ -118,5 +94,4 @@ def news_questions() -> dict:
             },
         )
     assert set(TIPOS) == {"resumo", "artigo-completo"}
-    assert set(TEMA_NOULS.values()) == set(TEMAS)
     return questions
