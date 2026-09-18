@@ -341,6 +341,7 @@ async function refreshSources() {
 
 let previewLoaded = false;
 let jevLoaded = false;
+let jevThemesDraft = [];
 let jevOpenRun = null;
 let jevSelectedIndex = -1;
 let jevFilter = defaultJevFilter();
@@ -371,6 +372,7 @@ $$(".tab").forEach((btn) => {
     }
     if (btn.dataset.tab === "jev" && !jevLoaded) {
       jevLoaded = true;
+      loadJevThemes();
       loadJevRuns();
     }
   });
@@ -527,6 +529,121 @@ function renderPreview(data) {
 }
 
 $("#refresh-preview").onclick = loadPreview;
+
+function renumberJevThemesDraft() {
+  jevThemesDraft.forEach((th, i) => {
+    th.rank = i + 1;
+  });
+}
+
+function renderJevThemeEditor() {
+  const root = $("#jev-theme-editor");
+  if (!root) return;
+  const n = jevThemesDraft.length;
+  const rows = jevThemesDraft
+    .map(
+      (th, i) => `<tr class="border-b border-slate-100" data-theme-i="${i}">
+      <td class="py-2 pr-2 text-xs tabular-nums text-slate-400 w-8">${i + 1}</td>
+      <td class="py-2 pr-2"><input type="text" data-theme-field="label_en" data-theme-i="${i}" value="${esc(th.label_en)}"
+        class="w-full min-w-[7rem] rounded-md border border-slate-200 px-2 py-1 text-xs"></td>
+      <td class="py-2 pr-2"><input type="text" data-theme-field="label_pt" data-theme-i="${i}" value="${esc(th.label_pt)}"
+        class="w-full min-w-[7rem] rounded-md border border-slate-200 px-2 py-1 text-xs"></td>
+      <td class="py-2 pr-2 whitespace-nowrap">
+        <button type="button" data-theme-up="${i}" class="rounded border border-slate-200 px-1.5 text-xs" ${i === 0 ? "disabled" : ""}>↑</button>
+        <button type="button" data-theme-down="${i}" class="rounded border border-slate-200 px-1.5 text-xs ml-1" ${i === n - 1 ? "disabled" : ""}>↓</button>
+      </td>
+      <td class="py-2 text-center"><input type="checkbox" data-theme-enabled="${i}" ${th.enabled ? "checked" : ""}></td>
+    </tr>`
+    )
+    .join("");
+  root.innerHTML = `<h3 class="text-sm font-medium text-slate-800 m-0 mb-1">${esc(t("themeEditorTitle"))}</h3>
+    <p class="text-xs text-slate-500 m-0 mb-3">${esc(t("ranksNextDigest"))}</p>
+    <table class="w-full text-left text-sm">
+      <thead><tr class="text-xs text-slate-500 border-b border-slate-200">
+        <th class="pb-2 pr-2 font-medium">#</th>
+        <th class="pb-2 pr-2 font-medium">${esc(t("themeLabelEn"))}</th>
+        <th class="pb-2 pr-2 font-medium">${esc(t("themeLabelPt"))}</th>
+        <th class="pb-2 pr-2 font-medium"></th>
+        <th class="pb-2 font-medium text-center">${esc(t("themeEnabled"))}</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="flex flex-wrap gap-2 mt-3">
+      <button type="button" id="jev-theme-add" class="rounded-md border border-slate-200 px-3 py-1.5 text-xs">${esc(t("addTheme"))}</button>
+      <button type="button" id="jev-theme-save" class="primary text-xs">${esc(t("saveThemes"))}</button>
+    </div>`;
+
+  root.querySelectorAll("[data-theme-field]").forEach((input) => {
+    input.addEventListener("input", () => {
+      const i = Number(input.dataset.themeI);
+      const field = input.dataset.themeField;
+      if (jevThemesDraft[i]) jevThemesDraft[i][field] = input.value;
+    });
+  });
+  root.querySelectorAll("[data-theme-enabled]").forEach((box) => {
+    box.addEventListener("change", () => {
+      const i = Number(box.dataset.themeEnabled);
+      if (jevThemesDraft[i]) jevThemesDraft[i].enabled = box.checked;
+    });
+  });
+  root.querySelectorAll("[data-theme-up]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const i = Number(btn.dataset.themeUp);
+      if (i <= 0) return;
+      [jevThemesDraft[i - 1], jevThemesDraft[i]] = [jevThemesDraft[i], jevThemesDraft[i - 1]];
+      renumberJevThemesDraft();
+      renderJevThemeEditor();
+    });
+  });
+  root.querySelectorAll("[data-theme-down]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const i = Number(btn.dataset.themeDown);
+      if (i >= jevThemesDraft.length - 1) return;
+      [jevThemesDraft[i], jevThemesDraft[i + 1]] = [jevThemesDraft[i + 1], jevThemesDraft[i]];
+      renumberJevThemesDraft();
+      renderJevThemeEditor();
+    });
+  });
+  $("#jev-theme-add").onclick = () => {
+    jevThemesDraft.push({
+      id: "",
+      label_en: "",
+      label_pt: "",
+      rank: jevThemesDraft.length + 1,
+      enabled: true,
+    });
+    renderJevThemeEditor();
+  };
+  $("#jev-theme-save").onclick = () =>
+    saveJevThemes().catch((e) => setStatus($("#jev-status"), e.message, false));
+}
+
+async function loadJevThemes() {
+  const root = $("#jev-theme-editor");
+  if (!root) return;
+  try {
+    const data = await api("/api/jev/themes");
+    jevThemesDraft = (data.themes || []).map((th) => ({ ...th }));
+    renderJevThemeEditor();
+  } catch (e) {
+    root.innerHTML = `<p class="text-xs text-rose-600">${esc(e.message)}</p>`;
+  }
+}
+
+async function saveJevThemes() {
+  renumberJevThemesDraft();
+  const body = jevThemesDraft.map((th) => ({
+    id: th.id || "",
+    label_en: (th.label_en || "").trim(),
+    label_pt: (th.label_pt || "").trim(),
+    rank: th.rank,
+    enabled: Boolean(th.enabled),
+  }));
+  const data = await api("/api/jev/themes", { method: "PUT", body: JSON.stringify(body) });
+  jevThemesDraft = (data.themes || []).map((th) => ({ ...th }));
+  renderJevThemeEditor();
+  setStatus($("#jev-status"), t("themesSaved"), true);
+}
 
 async function loadJevRuns() {
   const status = $("#jev-status");

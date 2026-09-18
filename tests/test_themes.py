@@ -1,7 +1,13 @@
 import pytest
 
 import settings_store as store
-from themes import DEFAULT_THEMES, compiled_relevance, list_themes, save_themes
+from themes import (
+    DEFAULT_THEMES,
+    compiled_relevance,
+    list_themes,
+    replace_themes,
+    save_themes,
+)
 
 
 @pytest.fixture
@@ -95,6 +101,50 @@ def test_compiled_relevance_prefers_high_rank_theme():
 
 def test_compiled_relevance_missing_theme_is_zero():
     assert compiled_relevance({}, ["economia"]) == 0
+
+
+def test_replace_themes_drops_omitted_ids(themes_db):
+    list_themes()
+    rows = replace_themes(
+        [
+            {
+                "id": "economia",
+                "label_en": "Economy",
+                "label_pt": "economia",
+                "rank": 99,
+                "enabled": True,
+            },
+            {
+                "id": "mundo",
+                "label_en": "World",
+                "label_pt": "mundo",
+                "rank": 1,
+                "enabled": True,
+            },
+        ]
+    )
+    assert len(rows) == 2
+    assert rows[0]["id"] == "mundo"
+    assert rows[0]["rank"] == 1
+    assert rows[1]["id"] == "economia"
+    assert rows[1]["rank"] == 2
+
+
+def test_replace_themes_slug_new_id_from_label(themes_db):
+    list_themes()
+    rows = replace_themes(
+        [
+            {
+                "label_en": "Space News",
+                "label_pt": "espaço",
+                "rank": 1,
+                "enabled": True,
+            },
+        ]
+    )
+    assert len(rows) == 1
+    assert rows[0]["id"] == "space-news"
+    assert rows[0]["label_en"] == "Space News"
 
 
 def test_default_theme_ids_match_legacy_temas():

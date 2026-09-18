@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from settings_store import _get_connection, init_db
+
+_THEME_ID_RE = re.compile(r"^[a-z0-9_-]+$")
 
 DEFAULT_THEMES: list[dict[str, str]] = [
     {"id": "política", "label_en": "Politics", "label_pt": "política"},
@@ -19,6 +22,8 @@ DEFAULT_THEMES: list[dict[str, str]] = [
     {"id": "opinião", "label_en": "Opinion", "label_pt": "opinião"},
     {"id": "clima", "label_en": "Climate", "label_pt": "clima"},
 ]
+
+_LEGACY_IDS = frozenset(t["id"] for t in DEFAULT_THEMES)
 
 
 def _row_to_theme(row: Any) -> dict[str, Any]:
@@ -76,6 +81,77 @@ def save_themes(themes: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     theme["label_pt"],
                     int(theme["rank"]),
                     1 if theme.get("enabled", True) else 0,
+                ),
+            )
+    return list_themes()
+
+
+def _slug_from_label_en(label_en: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", label_en.lower().strip())
+    slug = re.sub(r"-+", "-", slug).strip("-")
+    return slug or "theme"
+
+
+def _is_valid_theme_id(theme_id: str) -> bool:
+    if theme_id in _LEGACY_IDS:
+        return True
+    return bool(_THEME_ID_RE.match(theme_id))
+
+
+def replace_themes(themes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    init_db()
+    ordered = sorted(themes, key=lambda t: int(t.get("rank") or 0))
+    used_ids: set[str] = set()
+    normalized: list[dict[str, Any]] = []
+    for i, theme in enumerate(ordered, start=1):
+        raw_id = (theme.get("id") or "").strip()
+        if raw_id:
+            if not _is_valid_theme_id(raw_id):
+                raise ValueError(f"invalid theme id: {raw_id}")
+            tid = raw_id
+        else:
+            base = _slug_from_label_en(str(theme.get("label_en") or ""))
+            tid = base
+            n = 2
+            while tid in used_ids:
+                tid = f"{base}-{n}"
+                n += 1
+        used_ids.add(tid)
+        normalized.append(
+            {
+                "id": tid,
+                "label_en": str(theme.get("label_en") or "").strip(),
+                "label_pt": str(theme.get("label_pt") or "").strip(),
+                "rank": i,
+                "enabled": bool(theme.get("enabled", True)),
+            }
+        )
+    with _get_connection() as conn:
+        if normalized:
+            placeholders = ",".join("?" * len(normalized))
+            conn.execute(
+                f"DELETE FROM jev_themes WHERE id NOT IN ({placeholders})",
+                [t["id"] for t in normalized],
+            )
+        else:
+            conn.execute("DELETE FROM jev_themes")
+        for theme in normalized:
+            conn.execute(
+                """
+                INSERT INTO jev_themes (id, label_en, label_pt, rank, enabled)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    label_en = excluded.label_en,
+                    label_pt = excluded.label_pt,
+                    rank = excluded.rank,
+                    enabled = excluded.enabled
+                """,
+                (
+                    theme["id"],
+                    theme["label_en"],
+                    theme["label_pt"],
+                    theme["rank"],
+                    1 if theme["enabled"] else 0,
                 ),
             )
     return list_themes()

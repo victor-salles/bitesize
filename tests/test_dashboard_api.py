@@ -240,6 +240,72 @@ def test_preview_returns_headlines(client, monkeypatch):
     assert r.get_json()["categories"][0]["feeds"][0]["headlines"][0]["title"] == "Capa"
 
 
+def test_jev_themes_get_lists_catalog(client):
+    r = client.get("/api/jev/themes")
+    assert r.status_code == 200
+    themes = r.get_json()["themes"]
+    ids = [t["id"] for t in themes]
+    assert "economia" in ids
+    assert themes[0]["rank"] == 1
+
+
+def test_jev_themes_put_requires_token(client):
+    r = client.put("/api/jev/themes", json=[])
+    assert r.status_code == 401
+
+
+def test_jev_themes_put_reorder_persists(client):
+    auth = {"Authorization": "Bearer test-token"}
+    listed = client.get("/api/jev/themes").get_json()["themes"]
+    by_id = {t["id"]: dict(t) for t in listed}
+    by_id["economia"]["rank"] = 1
+    by_id["política"]["rank"] = 2
+    body = sorted(by_id.values(), key=lambda t: t["rank"])
+    r = client.put("/api/jev/themes", json=body, headers=auth)
+    assert r.status_code == 200
+    saved = r.get_json()["themes"]
+    assert saved[0]["id"] == "economia"
+    assert saved[0]["rank"] == 1
+    assert saved[1]["id"] == "política"
+    assert saved[1]["rank"] == 2
+    again = client.get("/api/jev/themes").get_json()["themes"]
+    assert again[0]["id"] == "economia"
+
+
+def test_jev_themes_put_rejects_bad_id(client):
+    auth = {"Authorization": "Bearer test-token"}
+    listed = client.get("/api/jev/themes").get_json()["themes"]
+    listed[0]["id"] = "Not Valid!"
+    r = client.put("/api/jev/themes", json=listed, headers=auth)
+    assert r.status_code == 400
+
+
+def test_jev_themes_put_replaces_list(client):
+    auth = {"Authorization": "Bearer test-token"}
+    body = [
+        {
+            "id": "economia",
+            "label_en": "Economy",
+            "label_pt": "economia",
+            "rank": 1,
+            "enabled": True,
+        },
+        {
+            "id": "mundo",
+            "label_en": "World",
+            "label_pt": "mundo",
+            "rank": 2,
+            "enabled": True,
+        },
+    ]
+    r = client.put("/api/jev/themes", json=body, headers=auth)
+    assert r.status_code == 200
+    saved = r.get_json()["themes"]
+    assert len(saved) == 2
+    assert {t["id"] for t in saved} == {"economia", "mundo"}
+    assert [t["rank"] for t in saved] == [1, 2]
+
+
 def test_put_settings_skips_blank_smtp_password(client):
     store.set_setting("smtp_password", "keep-me")
     r = client.put(

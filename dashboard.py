@@ -12,7 +12,7 @@ import settings_store as store
 from config import BASE_DIR, load_env, reload_settings
 import jev_labels
 import jev_log
-from themes import list_themes
+from themes import list_themes, replace_themes
 from kindle import send_test_email
 from preview import PREVIEW_FETCH_LIMIT, build_source_preview
 
@@ -164,6 +164,23 @@ def put_feed(feed_id: int):
 def delete_feed(feed_id: int):
     store.delete_feed(feed_id)
     return jsonify({"ok": True})
+
+
+@app.get("/api/jev/themes")
+def get_jev_themes():
+    return jsonify({"themes": list_themes()})
+
+
+@app.put("/api/jev/themes")
+def put_jev_themes():
+    data = request.get_json(silent=True)
+    if not isinstance(data, list):
+        return jsonify({"error": "Expected JSON array"}), 400
+    try:
+        themes = replace_themes(data)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify({"themes": themes})
 
 
 @app.get("/api/jev/runs")
