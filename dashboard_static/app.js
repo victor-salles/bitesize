@@ -13,6 +13,7 @@ const BOOL_KEYS = new Set([
   "integration_gmail",
   "integration_google_calendar",
   "cli_select_all_sources",
+  "jev_triage_enabled",
 ]);
 
 const KINDLE_KEYS = [

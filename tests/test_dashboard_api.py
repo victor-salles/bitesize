@@ -30,16 +30,20 @@ def test_get_settings(client):
     data = r.get_json()
     assert "ai" in data
     assert data["ai"]["ai_backend"] in ("gemini", "ollama", "antigravity")
+    assert data["ai"]["jev_triage_enabled"] is False
 
 
 def test_put_settings(client):
     r = client.put(
         "/api/settings",
-        json={"ai_backend": "ollama"},
+        json={"ai_backend": "ollama", "jev_triage_enabled": True, "jev_min_keep": 40},
         headers={"Authorization": "Bearer test-token"},
     )
     assert r.status_code == 200
-    assert store.load_settings().ai_backend == "ollama"
+    s = store.load_settings()
+    assert s.ai_backend == "ollama"
+    assert s.jev_triage_enabled is True
+    assert s.jev_min_keep == 40
 
 
 def test_sources_crud(client):

@@ -23,6 +23,9 @@ SETTINGS_DEFAULTS: dict[str, tuple[str, str, Any]] = {
     "gemini_timeout": ("ai", "int", 120),
     "gemini_check_timeout": ("ai", "int", 6),
     "ai_language": ("ai", "str", "pt-BR"),
+    "jev_triage_enabled": ("ai", "bool", False),
+    "jev_workers": ("ai", "int", 4),
+    "jev_min_keep": ("ai", "int", 0),
     "max_articles_per_feed": ("feed", "int", 10),
     "feed_timeout": ("feed", "int", 15),
     "truncate_chars": ("feed", "int", 450),
@@ -64,6 +67,9 @@ class Settings:
     gemini_timeout: int = 120
     gemini_check_timeout: int = 6
     ai_language: str = "pt-BR"
+    jev_triage_enabled: bool = False
+    jev_workers: int = 4
+    jev_min_keep: int = 0
     max_articles_per_feed: int = 10
     feed_timeout: int = 15
     truncate_chars: int = 450
@@ -212,6 +218,9 @@ _ENV_TO_SETTING = {
     "AI_BACKEND": "ai_backend",
     "ANTIGRAVITY_MODEL": "antigravity_model",
     "AI_LANGUAGE": "ai_language",
+    "JEV_TRIAGE_ENABLED": "jev_triage_enabled",
+    "JEV_WORKERS": "jev_workers",
+    "JEV_MIN_KEEP": "jev_min_keep",
     "OLLAMA_HOST": "ollama_host",
     "OLLAMA_MODEL": "ollama_model",
     "OLLAMA_TIMEOUT": "ollama_timeout",
@@ -261,13 +270,23 @@ def migrate_from_files_if_empty() -> bool:
     env = _parse_env_file(ENV_FILE)
     env_updates: dict[str, Any] = {}
     for env_key, setting_key in _ENV_TO_SETTING.items():
-        if env_key in env and env[env_key]:
-            _, value_type, _ = SETTINGS_DEFAULTS[setting_key]
-            raw = env[env_key]
-            if value_type == "int":
-                env_updates[setting_key] = int(raw)
-            else:
-                env_updates[setting_key] = raw
+        if env_key not in env:
+            continue
+        raw = env[env_key]
+        if raw == "":
+            continue
+        _, value_type, _ = SETTINGS_DEFAULTS[setting_key]
+        if value_type == "int":
+            env_updates[setting_key] = int(raw)
+        elif value_type == "bool":
+            env_updates[setting_key] = raw.strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
+        else:
+            env_updates[setting_key] = raw
     if env_updates:
         update_settings(env_updates)
         migrated = True

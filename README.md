@@ -86,6 +86,10 @@ AI_BACKEND=gemini
 
 If no backend is available, the digest still runs — articles are kept with length-based relevance fallbacks and no AI summaries.
 
+**Jev (optional triage)**
+
+TypeSafe’s Jev scores ads, keep/drop, relevance, completeness, and Portuguese temas. Summaries and covers still use Antigravity / Gemini / Ollama. Put `TYPESAFE_API_KEY` in `.env`, then turn on `jev_triage_enabled` in the dashboard. Set `jev_min_keep` (for example `40`) to drop weak stories for a shorter Kindle book.
+
 ### 4. Kindle delivery (optional)
 
 Edit `.env` or the dashboard with your `@kindle.com` address and Gmail SMTP credentials.
