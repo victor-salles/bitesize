@@ -561,9 +561,9 @@ function pct(v) {
 }
 
 function tipoEditor(item, i) {
-  const t = humanOr(item, "tipo", item.tipo);
+  const tipoVal = humanOr(item, "tipo", item.tipo);
   const btn = (value, label, onCls, offCls) => {
-    const on = t === value;
+    const on = tipoVal === value;
     return `<button type="button" data-jev-label="tipo" data-jev-i="${i}" data-value="${value}"
       class="inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${on ? onCls : offCls}">${label}</button>`;
   };
