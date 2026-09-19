@@ -1,3 +1,6 @@
+import io
+import time
+
 import pytest
 
 import dashboard
@@ -321,3 +324,53 @@ def test_put_settings_skips_blank_smtp_password(client):
     )
     assert r.status_code == 200
     assert store.load_settings().smtp_password == "keep-me"
+
+
+def test_digest_status_idle(client, monkeypatch):
+    import digest_run
+
+    runner = digest_run.DigestRunner()
+    monkeypatch.setattr(dashboard, "runner", runner)
+    r = client.get("/api/digest/run")
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["status"] == "idle"
+    assert [s["id"] for s in body["steps"]] == [
+        "feeds",
+        "fulltext",
+        "score",
+        "covers",
+        "epub",
+        "kindle",
+        "books",
+    ]
+
+
+def test_digest_start_requires_token(client):
+    r = client.post("/api/digest/run")
+    assert r.status_code == 401
+
+
+def test_digest_start_busy_returns_409(client, monkeypatch):
+    import digest_run
+
+    runner = digest_run.DigestRunner()
+    monkeypatch.setattr(dashboard, "runner", runner)
+
+    class SlowProc:
+        def __init__(self):
+            self.stdout = io.StringIO("✓  Fetched 1 raw articles\n")
+            self.returncode = None
+
+        def wait(self):
+            time.sleep(0.4)
+            self.returncode = 0
+            return 0
+
+    monkeypatch.setattr(digest_run.subprocess, "Popen", lambda *a, **k: SlowProc())
+    auth = {"Authorization": "Bearer test-token"}
+    first = client.post("/api/digest/run", headers=auth)
+    assert first.status_code == 202
+    second = client.post("/api/digest/run", headers=auth)
+    assert second.status_code == 409
+

@@ -17,7 +17,7 @@ The morning pipeline is in daily use: RSS → full text → AI filter/summarize/
 - **Scoring:** fallback stays below 70; cover and section leads prefer AI scores over length stand-ins; clustered AI batches get one listwise re-rank.
 - **Open-source hygiene:** MIT license, `SECURITY.md`, pytest + coverage + pip-audit + gitleaks CI, Dependabot, GitHub issue templates.
 
-The dashboard **Preview** tab now loads live headlines per source. **Jev** tab lists each classify run and the JSON file under `output/jev/`. English chrome by default (`ui_language` / localStorage); Rel, Ad, and per-theme scores use percent + bar (no Keep column or rel/keep/ad filter sliders). You can correct Ad, Rel, Tipo, Temas, and the extra scores per story; **Export labels** writes a gold file for later question/threshold work. Still missing: last-digest preview, AI summary preview, magazine cover preview, Jev field picker.
+The dashboard **Preview** tab now loads live headlines per source. The header **Run digest** button starts the same `--all` job as the morning run and lists each pipeline step with a live log. **Jev** tab lists each classify run and the JSON file under `output/jev/`. English chrome by default (`ui_language` / localStorage); Rel, Ad, and per-theme scores use percent + bar (no Keep column or rel/keep/ad filter sliders). You can correct Ad, Rel, Tipo, Temas, and the extra scores per story; **Export labels** writes a gold file for later question/threshold work. Still missing: last-digest preview, AI summary preview, magazine cover preview, Jev field picker.
 
 ## Next
 

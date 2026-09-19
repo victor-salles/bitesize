@@ -24,7 +24,17 @@
       <label for="dashboard-token">Write API token</label>
       <input id="dashboard-token" type="password" placeholder="Bearer token (if configured)">
     </div>
+    <div class="field">
+      <button type="button" id="run-digest" class="primary">Run digest</button>
+      <p class="text-xs text-slate-500 m-0 mt-1" id="digest-hint">Same as the morning job: fetch, score, EPUB, then Kindle and Books if those are on.</p>
+      <p id="digest-run-status" class="status"></p>
+    </div>
   </header>
+
+  <div id="digest-progress" class="card mx-6 mb-4">
+    <ol id="digest-steps" class="m-0 pl-0 list-none grid gap-2"></ol>
+    <pre id="digest-log" class="text-[11px] leading-snug text-slate-600 bg-slate-50 rounded-lg p-3 max-h-40 overflow-auto whitespace-pre-wrap m-0 mt-3 hidden"></pre>
+  </div>
 
   <nav class="tabs">
     <button class="tab active" data-tab="settings">Settings</button>
@@ -86,6 +96,6 @@
   </footer>
 
   <script src="/i18n.js?v=jev8"></script>
-  <script src="/app.js?v=jev10"></script>
+  <script src="/app.js?v=jev11"></script>
 </body>
 </html>

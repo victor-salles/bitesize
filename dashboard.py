@@ -15,6 +15,8 @@ import jev_log
 from themes import list_themes, replace_themes
 from kindle import send_test_email
 from preview import PREVIEW_FETCH_LIMIT, build_source_preview
+import digest_run
+from digest_run import BusyError
 
 load_env()
 
@@ -38,6 +40,7 @@ def _resolve_dashboard_token() -> str:
 
 
 DASHBOARD_TOKEN = _resolve_dashboard_token()
+runner = digest_run.runner
 
 app = Flask(__name__, static_folder=str(STATIC_DIR), static_url_path="")
 
@@ -66,6 +69,21 @@ def index():
 @app.get("/api/health")
 def health():
     return jsonify({"ok": True})
+
+
+@app.get("/api/digest/run")
+def digest_status():
+    return jsonify(runner.snapshot())
+
+
+@app.post("/api/digest/run")
+def digest_start():
+    try:
+        return jsonify(runner.start()), 202
+    except BusyError as exc:
+        body = runner.snapshot()
+        body["error"] = str(exc)
+        return jsonify(body), 409
 
 
 @app.get("/api/settings")

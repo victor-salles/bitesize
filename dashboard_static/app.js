@@ -82,6 +82,8 @@ function applyStaticI18n() {
     ".subtitle": "headerSubtitle",
     'label[for="dashboard-token"]': "tokenLabel",
     "#save-settings": "saveSettings",
+    "#run-digest": "runDigest",
+    "#digest-hint": "digestHint",
     "#panel-jev .preview-intro": "jevIntro",
     "#refresh-jev": "reloadRuns",
     "#export-jev-labels": "exportLabels",
@@ -247,6 +249,119 @@ function setUiLang(lang, { persist = false } = {}) {
       if (el && val != null) el.value = val;
     }
     readJevFilters();
+  }
+  if (lastDigestSnap) paintDigestProgress(lastDigestSnap);
+}
+
+const DIGEST_STEP_KEYS = {
+  feeds: "stepFeeds",
+  fulltext: "stepFulltext",
+  score: "stepScore",
+  covers: "stepCovers",
+  epub: "stepEpub",
+  kindle: "stepKindle",
+  books: "stepBooks",
+};
+const DIGEST_STATE_KEYS = {
+  pending: "stepPending",
+  running: "stepRunning",
+  done: "stepDone",
+  skipped: "stepSkipped",
+  error: "stepError",
+};
+
+let digestPoll = null;
+let lastDigestSnap = null;
+let lastDigestStatus = "idle";
+
+function paintDigestProgress(data) {
+  lastDigestSnap = data;
+  const list = $("#digest-steps");
+  const log = $("#digest-log");
+  const btn = $("#run-digest");
+  if (!list || !data) return;
+  const mark = { pending: "○", running: "●", done: "✓", skipped: "–", error: "✕" };
+  const color = {
+    pending: "text-slate-400",
+    running: "text-sky-700 font-medium",
+    done: "text-emerald-700",
+    skipped: "text-slate-400",
+    error: "text-rose-600",
+  };
+  list.innerHTML = (data.steps || [])
+    .map((s) => {
+      const state = s.state || "pending";
+      return `<li class="flex items-center justify-between gap-3 text-sm ${color[state] || "text-slate-500"}">
+        <span>${mark[state] || "○"} ${esc(t(DIGEST_STEP_KEYS[s.id] || s.label || s.id))}</span>
+        <span class="text-[11px] uppercase tracking-wide">${esc(t(DIGEST_STATE_KEYS[state] || "stepPending"))}</span>
+      </li>`;
+    })
+    .join("");
+  const lines = (data.lines || []).slice(-16);
+  if (log) {
+    if (lines.length) {
+      log.classList.remove("hidden");
+      log.textContent = lines.join("\n");
+      log.scrollTop = log.scrollHeight;
+    } else {
+      log.classList.add("hidden");
+      log.textContent = "";
+    }
+  }
+  if (btn) btn.disabled = data.status === "running";
+  const st = $("#digest-run-status");
+  if (!st) return;
+  if (data.status === "running") setStatus(st, t("digestRunning"), true);
+  else if (data.status === "done") setStatus(st, t("digestDone"), true);
+  else if (data.status === "error") setStatus(st, data.error || t("digestFailed"), false);
+}
+
+function startDigestPoll() {
+  if (digestPoll) return;
+  digestPoll = setInterval(() => {
+    refreshDigestProgress().catch(() => {});
+  }, 500);
+}
+
+function stopDigestPoll() {
+  if (!digestPoll) return;
+  clearInterval(digestPoll);
+  digestPoll = null;
+}
+
+async function refreshDigestProgress() {
+  const data = await api("/api/digest/run");
+  const wasRunning = lastDigestStatus === "running";
+  paintDigestProgress(data);
+  lastDigestStatus = data.status || "idle";
+  if (data.status === "running") startDigestPoll();
+  else stopDigestPoll();
+  if (wasRunning && data.status === "done") {
+    loadJevRuns().catch(() => {});
+  }
+}
+
+async function startDigest() {
+  const st = $("#digest-run-status");
+  if (!dashboardToken()) {
+    setStatus(st, t("digestNeedToken"), false);
+    return;
+  }
+  try {
+    const r = await fetch("/api/digest/run", { method: "POST", headers: authHeaders() });
+    const data = await r.json().catch(() => ({}));
+    if (r.status === 409) {
+      paintDigestProgress(data);
+      setStatus(st, t("digestBusy"), false);
+      startDigestPoll();
+      return;
+    }
+    if (!r.ok) throw new Error(data.error || r.statusText);
+    lastDigestStatus = "running";
+    paintDigestProgress(data);
+    startDigestPoll();
+  } catch (e) {
+    setStatus(st, e.message, false);
   }
 }
 
@@ -1303,6 +1418,9 @@ $$("#ui-lang-switch [data-ui-lang]").forEach((btn) => {
 loadSettings().then(refreshSources).catch((e) => {
   setStatus($("#settings-status"), e.message, false);
 });
+
+$("#run-digest")?.addEventListener("click", startDigest);
+refreshDigestProgress().catch(() => {});
 
 const tokenInput = $("#dashboard-token");
 if (tokenInput) {
