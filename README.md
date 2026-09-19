@@ -88,7 +88,7 @@ If no backend is available, the digest still runs — articles are kept with len
 
 **Jev (optional triage)**
 
-TypeSafe’s Jev scores ads, compiled relevance (0–100 from your ranked topics), completeness, and Portuguese temas. Summaries and covers still use Antigravity / Gemini / Ollama. Put `TYPESAFE_API_KEY` in `.env`, then turn on `jev_triage_enabled` in the dashboard. Set `jev_min_keep` to a minimum compiled relevance (for example `40` on the 0–100 scale) to drop weak stories for a shorter Kindle book.
+TypeSafe’s Jev scores ads, compiled relevance (0–100 from your ranked topics), completeness, and Portuguese temas. Summaries and covers still use Antigravity / Gemini / Ollama. Put `TYPESAFE_API_KEY` in `.env` (a TypeSafe key, or a Vercel AI Gateway `vck_…` key from the Jev free tier), then turn on `jev_triage_enabled` in the dashboard. Gateway keys are routed to `https://ai-gateway.vercel.sh` instead of TypeSafe’s own API. Set `jev_min_keep` to a minimum compiled relevance (for example `40` on the 0–100 scale) to drop weak stories for a shorter Kindle book.
 
 ### 4. Kindle delivery (optional)
 

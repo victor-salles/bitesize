@@ -8,7 +8,7 @@ The morning pipeline is in daily use: RSS → full text → AI filter/summarize/
 
 - **Settings live in SQLite** (`data/bitesize.db`), edited from the local dashboard. `.env` / `sources.json` only seed an empty database.
 - **Three AI backends:** Antigravity (`agy`, default), Gemini CLI, Ollama. If none answer, the EPUB still writes with length-based scores and no summaries.
-- **Optional Jev triage:** TypeSafe scores ads, compiled relevance (0–100 from ranked theme matches), `resumo` vs `artigo-completo`, and pt-BR temas. Reader topic order in the dashboard sets rank (1 = strongest). Each call sends title, source, a ~480-character snippet, and `body_chars` — not the full article. Off until `jev_triage_enabled` is on and `TYPESAFE_API_KEY` is in `.env`. The writing model still writes summaries and covers.
+- **Optional Jev triage:** TypeSafe scores ads, compiled relevance (0–100 from ranked theme matches), `resumo` vs `artigo-completo`, and pt-BR temas. Reader topic order in the dashboard sets rank (1 = strongest). Each call sends title, source, a ~480-character snippet, and `body_chars` — not the full article. Off until `jev_triage_enabled` is on and a TypeSafe or Vercel AI Gateway key is in `.env`. Gateway `vck_…` keys go to `ai-gateway.vercel.sh`. The writing model still writes summaries and covers.
 - **pt-BR labels and prompts** (`ai_locale.py`). Language is a setting, not a rewrite of the pipeline.
 - **Paywall mirrors** when the direct fetch is thin or fails.
 - **Gmail and Calendar sections** are wired in `main.py` and off by default. Enable them in the dashboard; the daily `--all` run will pick them up.

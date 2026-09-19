@@ -238,6 +238,10 @@ def process_articles(articles: list[dict], batch_size: int | None = None) -> lis
             return _process_articles_jev(articles, batch_size)
         except Exception as exc:
             console.print(f"  [yellow]⚠  Jev triage failed ({exc}) — using writing model[/yellow]")
+    elif get_settings().jev_triage_enabled:
+        console.print(
+            "  [yellow]⚠  Jev is on, but no TypeSafe or Vercel AI Gateway key is loaded — skipping scoring[/yellow]"
+        )
     return _process_articles_llm(articles, batch_size)
 
 

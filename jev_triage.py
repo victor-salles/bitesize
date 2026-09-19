@@ -14,12 +14,32 @@ from themes import list_themes
 from tags import normalize_tags
 
 MAX_WORKERS = 32
+GATEWAY_BASE_URL = "https://ai-gateway.vercel.sh"
+
+
+def _api_key() -> str:
+    for env in ("TYPESAFE_API_KEY", "AI_GATEWAY_API_KEY"):
+        value = os.environ.get(env, "").strip()
+        if value:
+            return value
+    return ""
+
+
+def client_kwargs() -> dict[str, str]:
+    key = _api_key()
+    kwargs: dict[str, str] = {"api_key": key}
+    base = os.environ.get("TYPESAFE_BASE_URL", "").strip()
+    if not base and key.startswith("vck_"):
+        base = GATEWAY_BASE_URL
+    if base:
+        kwargs["base_url"] = base.rstrip("/")
+    return kwargs
 
 
 def available() -> bool:
     if not get_settings().jev_triage_enabled:
         return False
-    return bool(os.environ.get("TYPESAFE_API_KEY", "").strip())
+    return bool(_api_key())
 
 
 def worker_count(raw: int | None = None) -> int:
@@ -91,7 +111,7 @@ def classify_article(
         if system_one is None:
             from typesafe_sdk import TypeSafeClient
 
-            with TypeSafeClient() as client:
+            with TypeSafeClient(**client_kwargs()) as client:
                 response = client.system_one(state=state, questions=questions)
         else:
             response = system_one(state=state, questions=questions)

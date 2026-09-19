@@ -51,10 +51,37 @@ def test_available_needs_flag_and_api_key(monkeypatch):
 
     settings.jev_triage_enabled = True
     monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+    monkeypatch.delenv("AI_GATEWAY_API_KEY", raising=False)
     assert jev_triage.available() is False
 
     monkeypatch.setenv("TYPESAFE_API_KEY", "ts_test")
     assert jev_triage.available() is True
+
+
+def test_available_accepts_vercel_gateway_key(monkeypatch):
+    monkeypatch.setattr(
+        jev_triage,
+        "get_settings",
+        lambda: MagicMock(jev_triage_enabled=True),
+    )
+    monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+    monkeypatch.setenv("AI_GATEWAY_API_KEY", "vck_test")
+    assert jev_triage.available() is True
+
+
+def test_vercel_key_uses_ai_gateway_base(monkeypatch):
+    monkeypatch.delenv("TYPESAFE_BASE_URL", raising=False)
+    monkeypatch.delenv("AI_GATEWAY_API_KEY", raising=False)
+    monkeypatch.setenv("TYPESAFE_API_KEY", "vck_test")
+    kw = jev_triage.client_kwargs()
+    assert kw["api_key"] == "vck_test"
+    assert kw["base_url"] == "https://ai-gateway.vercel.sh"
+
+
+def test_explicit_base_url_wins(monkeypatch):
+    monkeypatch.setenv("TYPESAFE_API_KEY", "vck_test")
+    monkeypatch.setenv("TYPESAFE_BASE_URL", "https://example.test")
+    assert jev_triage.client_kwargs()["base_url"] == "https://example.test"
 
 
 def test_article_state_sends_snippet_not_full_body():
