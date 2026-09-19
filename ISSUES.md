@@ -49,6 +49,14 @@ This matches the documented single-user threat model. It is still an issue if th
 **Expected:** The running digest is the published default branch.  
 **Actual:** Useful work is on `main` at [github.com/victor-salles/bitesize](https://github.com/victor-salles/bitesize). Local feature worktrees may still exist; they are not the published default.
 
+## Opening page highlights the same story twice
+
+**Expected:** On the first page of the morning book, a story appears in at most one of the two highlight lists (best overall vs best in this section). A card without a summary does not print the title twice.
+
+**Actual:** The 6 September 2026 digest featured the same three stories in both lists (México surveillance tower, Alexa speakers, Musk data centers in space). Each card also repeated the title as the blurb. Four copies before any index.
+
+Hypothesis: the two lists are independent and only skip one hero story; today’s opening page has no hero. Tracked as [VIC-13](https://linear.app/victor-salles/issue/VIC-13/opening-page-highlights-the-same-story-twice).
+
 ## Relevance scores pile up in the same edition
 
 **Expected:** Stories in one digest have a useful spread, so “top stories” are actually the most important ones.  
