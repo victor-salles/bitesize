@@ -660,7 +660,8 @@ async function loadJevThemes() {
     jevThemesDraft = (data.themes || []).map((th) => ({ ...th }));
     renderJevThemeEditor();
   } catch (e) {
-    root.innerHTML = `<p class="text-xs text-rose-600">${esc(e.message)}</p>`;
+    root.innerHTML = `<p class="text-xs text-rose-600">${esc(t("themeEditorTitle"))}: ${esc(e.message)}</p>
+      <p class="text-xs text-slate-500 mt-1">Restart the dashboard if this stays after a refresh.</p>`;
   }
 }
 
@@ -756,38 +757,22 @@ function temaScoresMap(item) {
   return item.jev?.answers?.temas || {};
 }
 
-function themeScoresCell(item, run) {
-  const scores = temaScoresMap(item);
-  const catalog = (run?.themes || []).filter((th) => th.enabled);
-  const parts = [];
-  for (const th of catalog) {
-    const raw = scores[th.id];
-    if (raw == null || raw === "") continue;
-    const pct = Math.round(Number(raw) * 100);
-    if (Number.isNaN(pct)) continue;
-    const label = themeLabel(th.id, run);
-    parts.push(
-      `<div class="flex flex-col gap-0.5 min-w-[5rem]">
-        <span class="text-[10px] text-slate-400 leading-tight">${esc(label)}</span>
-        ${pctBar(pct)}
-      </div>`,
-    );
-  }
-  if (!parts.length) {
-    const ids = shownTemas(item);
-    if (!ids.length) return '<span class="text-xs text-slate-300">—</span>';
-    return `<div class="flex flex-wrap gap-1">${ids
-      .map((id) => `<span class="text-xs text-slate-500">${esc(themeLabel(id, run))}</span>`)
-      .join("")}</div>`;
-  }
-  return `<div class="flex flex-wrap gap-2 max-w-md">${parts.join("")}</div>`;
+function compactTemasCell(item) {
+  const ids = shownTemas(item);
+  if (!ids.length) return '<span class="text-xs text-slate-300">—</span>';
+  return `<div class="flex flex-wrap gap-1">${ids
+    .map((id) => {
+      const cls = TEMA_PILL[id] || "bg-slate-100 text-slate-600";
+      return `<span class="inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${cls}">${esc(themeLabel(id, jevOpenRun))}</span>`;
+    })
+    .join("")}</div>`;
 }
 
 function temaEditor(item, i) {
   const on = new Set(shownTemas(item));
   const catalog = (jevOpenRun?.themes || []).filter((th) => th.enabled);
   const ids = catalog.length ? catalog.map((th) => th.id) : Object.keys(TEMA_PILL);
-  return `<div class="flex flex-wrap gap-1 max-w-xs mt-1">${ids
+  return `<div class="flex flex-wrap gap-1 mt-2">${ids
     .map((tid) => {
       const active = on.has(tid);
       const cls = active ? TEMA_PILL[tid] : "bg-white text-slate-300 border border-slate-200";
@@ -796,6 +781,27 @@ function temaEditor(item, i) {
         class="inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${cls}">${esc(label)}</button>`;
     })
     .join("")}</div>`;
+}
+
+function themeScoresSidebar(item) {
+  const scores = temaScoresMap(item);
+  const catalog = (jevOpenRun?.themes || []).filter((th) => th.enabled);
+  const rows = [];
+  for (const th of catalog) {
+    const raw = scores[th.id];
+    if (raw == null || raw === "") continue;
+    const p = Math.round(Number(raw) * 100);
+    if (Number.isNaN(p)) continue;
+    rows.push(`<div class="mb-1.5">
+      <div class="flex items-baseline justify-between gap-2 text-[10px] uppercase tracking-wide text-slate-400">
+        <span>${esc(themeLabel(th.id, jevOpenRun))}</span>
+        <span class="tabular-nums text-slate-600">${p}%</span>
+      </div>
+      <div class="flex mt-0.5">${extraScoreVizBar(p, false)}</div>
+    </div>`);
+  }
+  if (!rows.length) return "";
+  return `<div class="mt-3 pt-3 border-t border-slate-100">${rows.join("")}</div>`;
 }
 
 function humanOr(item, key, fallback) {
@@ -890,7 +896,7 @@ function jevRowHtml(item, i) {
       <div class="text-sm leading-snug">${titleHtml}</div>
       <div class="text-xs text-slate-400 mt-0.5">${esc(item.source || "")}</div>
     </td>
-    <td class="py-3 px-2">${themeScoresCell(item, jevOpenRun)}${temaEditor(item, i)}</td>
+    <td class="py-3 px-2">${compactTemasCell(item)}</td>
     <td class="py-3 px-2 whitespace-nowrap">${tipoEditor(item, i)}</td>
     <td class="py-3 px-2">${pctBar(rel)}</td>
     <td class="py-3 px-2">${pctBar(adPct, { warn: true })}</td>
@@ -1106,7 +1112,7 @@ function renderJevRunDetail(run) {
         </table>
         </div>
       </div>
-      <aside class="w-full lg:w-72 shrink-0 rounded-xl border border-slate-200 bg-white p-4 sticky top-4">
+      <aside class="w-full lg:w-80 shrink-0 rounded-xl border border-slate-200 bg-white p-4 sticky top-4">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-sm font-semibold text-slate-800 m-0">${esc(t("run"))}</h2>
           <span class="text-xs text-emerald-700">${esc(statusLabel)}</span>
@@ -1132,12 +1138,23 @@ function renderJevRunDetail(run) {
     $(id)?.addEventListener("change", readJevFilters);
   });
   paintJevRows();
+  root.oninput = (ev) => {
+    const el = ev.target.closest("#jev-extra-labels [data-jev-label]");
+    if (!el || el.tagName !== "INPUT") return;
+    const bar = el.parentElement?.querySelector("[data-jev-viz]");
+    if (!bar) return;
+    const p = Math.max(0, Math.min(100, Number(el.value) || 0));
+    bar.style.width = `${p}%`;
+  };
   root.onchange = (ev) => {
     const el = ev.target.closest("[data-jev-label]");
     if (!el || el.tagName !== "INPUT") return;
     const index = Number(el.dataset.jevI);
     const field = el.dataset.jevLabel;
-    const raw = Number(el.value);
+    let raw = Number(el.value);
+    if (Number.isNaN(raw)) raw = 0;
+    raw = Math.max(0, Math.min(100, raw));
+    el.value = String(raw);
     const patch = field === "relevance" ? { relevance: raw } : { [field]: raw / 100 };
     persistJevLabel(index, patch).catch((e) => setStatus($("#jev-status"), e.message, false));
   };
@@ -1201,11 +1218,30 @@ function showJevJson(item) {
   paintExtraLabels(item);
 }
 
-function extraNoulRow(item, i, key, label) {
+function extraScoreVizBar(pct, warn) {
+  const p = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
+  const fill = warn && p >= 40 ? "bg-rose-500" : "bg-emerald-500";
+  return `<span class="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100">
+    <span data-jev-viz class="block h-full ${fill}" style="width:${p}%"></span>
+  </span>`;
+}
+
+function extraScoreRow(i, key, label, pct, warn) {
+  const p = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
+  return `<label class="mb-2 flex flex-col gap-0.5 text-[10px] uppercase tracking-wide text-slate-400">${esc(label)}
+    <span class="flex items-center gap-2">
+      <input type="number" min="0" max="100" step="1" value="${p}"
+        data-jev-label="${esc(key)}" data-jev-i="${i}"
+        class="w-14 rounded-md border border-slate-200 px-1.5 py-0.5 text-xs tabular-nums text-slate-700">
+      ${extraScoreVizBar(p, warn)}
+    </span>
+  </label>`;
+}
+
+function extraNoulRow(item, i, key, label, warn) {
   const frac = humanOr(item, key, item.jev?.answers?.[key]);
-  const p = frac == null || frac === "" ? 0 : Math.max(0, Math.min(100, Math.round(Number(frac) * 100)));
-  return `<label class="flex flex-col gap-0.5 text-[10px] uppercase tracking-wide text-slate-400">${esc(label)}
-    <input type="range" min="0" max="100" value="${p}" data-jev-label="${key}" data-jev-i="${i}" class="w-full"></label>`;
+  const p = frac == null || frac === "" ? 0 : Number(frac) * 100;
+  return extraScoreRow(i, key, label, p, warn);
 }
 
 function paintExtraLabels(item) {
@@ -1218,17 +1254,16 @@ function paintExtraLabels(item) {
   }
   box.classList.remove("hidden");
   const rel = humanOr(item, "relevance", item.relevance);
-  const relP = rel == null || rel === "" ? 0 : Math.max(0, Math.min(100, Math.round(Number(rel))));
   const ad = adVal(item);
-  const adP = Number.isNaN(ad) ? 0 : Math.max(0, Math.min(100, Math.round(ad * 100)));
+  const adP = Number.isNaN(ad) ? 0 : ad * 100;
   box.innerHTML = `<p class="text-xs font-medium text-slate-600 mb-2">${esc(t("correctScores"))}</p>
-    <label class="flex flex-col gap-0.5 text-[10px] uppercase tracking-wide text-slate-400 mb-2">${esc(t("rel"))}
-      <input type="range" min="0" max="100" value="${relP}" data-jev-label="relevance" data-jev-i="${i}" class="w-full"></label>
-    <label class="flex flex-col gap-0.5 text-[10px] uppercase tracking-wide text-slate-400 mb-2">${esc(t("ad"))}
-      <input type="range" min="0" max="100" value="${adP}" data-jev-label="ad" data-jev-i="${i}" class="w-full"></label>
+    ${extraScoreRow(i, "relevance", t("rel"), rel, false)}
+    ${extraScoreRow(i, "ad", t("ad"), adP, true)}
     ${extraNoulRow(item, i, "clickbait", "Clickbait")}
     ${extraNoulRow(item, i, "press_release", "Press release")}
-    ${extraNoulRow(item, i, "paywall_teaser", "Paywall teaser")}`;
+    ${extraNoulRow(item, i, "paywall_teaser", "Paywall teaser")}
+    ${themeScoresSidebar(item)}
+    ${temaEditor(item, i)}`;
 }
 
 async function persistJevLabel(index, patch) {

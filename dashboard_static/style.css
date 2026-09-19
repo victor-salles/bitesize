@@ -142,6 +142,14 @@ button.danger { color: var(--danger); border-color: #fecaca; }
   margin-bottom: 1rem;
 }
 
+#panel-jev .toolbar {
+  gap: 0.75rem;
+}
+
+#panel-jev .toolbar button {
+  padding: 0.65rem 1.15rem;
+}
+
 .category-header {
   display: flex;
   justify-content: space-between;
