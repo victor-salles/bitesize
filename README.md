@@ -51,7 +51,7 @@ Write APIs always need a Bearer token. The dashboard creates one at `data/dashbo
 
 ### 3. AI backend (pick one)
 
-Defaults in the database: **Antigravity** (`agy`) with `gemini-3.5-flash-high`, summaries in **pt-BR**. Change the model in the dashboard if you want a different one.
+Defaults in the database: **Antigravity** (`agy`) with `gemini-3.8-flash-high`, summaries in **pt-BR**. Change the model in the dashboard if you want a different one. Retired `gemini-3.5-flash-*` ids are mapped to 3.8 Flash.
 
 **Antigravity (default)**
 
@@ -59,7 +59,7 @@ Requires the `agy` CLI installed and authenticated. Set in the dashboard or `.en
 
 ```
 AI_BACKEND=antigravity
-ANTIGRAVITY_MODEL=gemini-3.5-flash-high
+ANTIGRAVITY_MODEL=gemini-3.8-flash-high
 AI_LANGUAGE=pt-BR
 ```
 

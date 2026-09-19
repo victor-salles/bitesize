@@ -16,7 +16,7 @@ def test_call_parses_agy_json_response(monkeypatch):
     monkeypatch.setattr(
         "antigravity_backend.get_settings",
         lambda: MagicMock(
-            antigravity_model="gemini-3.5-flash-high",
+            antigravity_model="gemini-3.8-flash-high",
             gemini_timeout=120,
         ),
     )
@@ -32,4 +32,36 @@ def test_call_parses_agy_json_response(monkeypatch):
     assert out == '[{"id":0,"skip":false,"summary":"Ok.","relevance":70}]'
     args = mock_run.call_args[0][0]
     assert args[0] == antigravity_backend._AGY_BIN
-    assert "--model=gemini-3.5-flash-high" in args
+    assert "--model=gemini-3.8-flash-high" in args
+
+
+def test_retired_35_flash_ids_map_to_38():
+    assert (
+        antigravity_backend.resolve_model("gemini-3.5-flash-medium")
+        == "gemini-3.8-flash-medium"
+    )
+    assert (
+        antigravity_backend.resolve_model("gemini-3.5-flash-high")
+        == "gemini-3.8-flash-high"
+    )
+    assert (
+        antigravity_backend.resolve_model("gemini-3.8-flash-low")
+        == "gemini-3.8-flash-low"
+    )
+
+
+def test_call_uses_mapped_model(monkeypatch):
+    antigravity_backend._AGY_OK = True
+    monkeypatch.setattr(
+        "antigravity_backend.get_settings",
+        lambda: MagicMock(
+            antigravity_model="gemini-3.5-flash-medium",
+            gemini_timeout=120,
+        ),
+    )
+    stdout = json.dumps({"status": "SUCCESS", "response": "ok"})
+    with patch("antigravity_backend.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stdout=stdout, stderr="")
+        antigravity_backend.call("Hi", "", label="test")
+    args = mock_run.call_args[0][0]
+    assert "--model=gemini-3.8-flash-medium" in args

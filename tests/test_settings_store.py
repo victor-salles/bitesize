@@ -12,6 +12,7 @@ def test_init_db_seeds_default_settings(isolated_store):
     assert s.max_articles_per_feed == 10
     assert s.ai_language == "pt-BR"
     assert s.kindle_delivery_enabled is True
+    assert s.antigravity_model == "gemini-3.8-flash-high"
 
 
 def test_set_and_get_setting(isolated_store):

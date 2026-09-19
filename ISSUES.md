@@ -5,9 +5,11 @@ Open problems seen in the running app. There is no GitHub issue tracker yet. Clo
 ## Antigravity flakes during the daily run
 
 **Expected:** Filter, summaries, and covers come back from `agy`.  
-**Actual:** Recent morning logs show `Antigravity exited 1` and `status 'ERROR'`. Articles are still kept (fallback scores). Some section covers and the global cover fall back to the non-AI layout.
+**Actual (19 Sep 2026):** Every `agy` call exited 1 with `invalid model selection` for `gemini-3.5-flash-medium`. That id is gone from `agy models` (now 3.6–3.8 Flash). The digest still wrote, with no summaries and placeholder covers.
 
-Seen on 29–30 August 2026 in `output/logs/digest-stdout.log`. Hypothesis: timeout or model error on large batches, not a missing CLI (later calls in the same run succeed).
+**Landed:** Retired 3.5 Flash ids map to the matching 3.8 Flash id at call time. Default setting is `gemini-3.8-flash-high`.
+
+Older morning logs (29–30 August) still had mixed `exited 1` / `status 'ERROR'` on large batches; keep an eye on timeouts after the model id is valid.
 
 ## Preview showed “No headlines” for every source
 

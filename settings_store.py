@@ -15,7 +15,7 @@ ENV_FILE = BASE_DIR / ".env"
 
 SETTINGS_DEFAULTS: dict[str, tuple[str, str, Any]] = {
     "ai_backend": ("ai", "str", "antigravity"),
-    "antigravity_model": ("ai", "str", "gemini-3.5-flash-high"),
+    "antigravity_model": ("ai", "str", "gemini-3.8-flash-high"),
     "ollama_host": ("ai", "str", "localhost:11434"),
     "ollama_model": ("ai", "str", "llama3:8b"),
     "ollama_timeout": ("ai", "int", 120),
@@ -60,7 +60,7 @@ SETTINGS_DEFAULTS: dict[str, tuple[str, str, Any]] = {
 @dataclass
 class Settings:
     ai_backend: str = "antigravity"
-    antigravity_model: str = "gemini-3.5-flash-high"
+    antigravity_model: str = "gemini-3.8-flash-high"
     ollama_host: str = "localhost:11434"
     ollama_model: str = "llama3:8b"
     ollama_timeout: int = 120
