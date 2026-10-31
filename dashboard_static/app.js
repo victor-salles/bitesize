@@ -1341,9 +1341,34 @@ function readJevFilters() {
   paintJevRows();
 }
 
+function jevErrorStatus(message) {
+  const m = /: (\d{3}) /.exec(message || "");
+  return m ? Number(m[1]) : null;
+}
+
+function jevFailureBanner(run) {
+  const failed = (run.items || []).filter((it) => it.error);
+  if (!failed.length) return "";
+  const counts = new Map();
+  for (const it of failed) {
+    const msg = it.error.replace(/^Not sent after access error: /, "");
+    counts.set(msg, (counts.get(msg) || 0) + 1);
+  }
+  const [top] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+  const status = jevErrorStatus(top);
+  const hintKey = { 401: "jevHint401", 403: "jevHint403", 429: "jevHint429" }[status];
+  return `<div class="jev-alert" role="alert">
+      <p class="jev-alert__title">${esc(t("jevFailedCount", { n: failed.length, total: run.article_count }))}</p>
+      ${hintKey ? `<p class="jev-alert__hint">${esc(t(hintKey))}</p>` : ""}
+      <details class="jev-alert__detail"><summary>${esc(t("jevErrorDetail"))}</summary><code>${esc(top)}</code></details>
+    </div>`;
+}
+
 function skipCell(item) {
   if (item.error) {
-    return `<span class="text-xs font-medium text-red-600">${esc(item.error)}</span>`;
+    const status = jevErrorStatus(item.error);
+    const label = item.error.startsWith("Not sent") ? t("jevNotSent") : status ? `${t("jevErrorTag")} ${status}` : t("jevErrorTag");
+    return `<span class="jev-err-tag" title="${esc(item.error)}">${esc(label)}</span>`;
   }
   if (item.skip) {
     return `<span class="text-xs font-medium text-slate-500">${esc(item.skip_reason || "skip")}</span>`;
@@ -1361,8 +1386,13 @@ function renderJevRunList(runs) {
     row.className =
       "rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm text-slate-700 shadow-sm hover:border-slate-300";
     const when = formatJevWhen(run.started_at) || esc(run.id);
+    const errors = run.errors || 0;
+    if (errors) row.classList.add("jev-run-chip--error");
+    const errorNote = !errors ? ""
+      : errors >= run.article_count ? ` · <span class="jev-run-chip__err">${esc(t("jevAllFailed"))}</span>`
+      : ` · <span class="jev-run-chip__err">${esc(t("jevErrorsCount", { n: errors }))}</span>`;
     row.innerHTML = `<span class="block font-medium text-slate-800">${esc(when)}</span>
-      <span class="block text-xs text-slate-500">${run.article_count} ${t("stories").toLowerCase()} · ${run.skipped} ${t("skipped").toLowerCase()}</span>`;
+      <span class="block text-xs text-slate-500">${run.article_count} ${t("stories").toLowerCase()} · ${run.skipped} ${t("skipped").toLowerCase()}${errorNote}</span>`;
     row.onclick = () => loadJevRun(run.id);
     root.appendChild(row);
   }
@@ -1439,6 +1469,7 @@ function renderJevRunDetail(run) {
       <h2 class="text-base font-semibold text-slate-800 m-0">${esc(runWhen)}</h2>
       <span class="text-xs text-slate-500">${run.article_count} ${t("stories").toLowerCase()}</span>
     </div>
+    ${jevFailureBanner(run)}
     <div class="flex flex-col lg:flex-row gap-6 items-start">
       <div class="flex-1 min-w-0 bg-white rounded-xl border border-slate-200">
         <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 p-3 border-b border-slate-100">
