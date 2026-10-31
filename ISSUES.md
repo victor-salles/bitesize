@@ -2,6 +2,17 @@
 
 Open problems seen in the running app. There is no GitHub issue tracker yet. Close an item here when it is no longer true.
 
+## Jev has scored nothing since 28 September
+
+**Expected:** Each morning run gets Jev scores (ad, relevance, tipo, temas) for every story.  
+**Actual:** Every story in every run from 28 Sep to 30 Oct 2026 failed with `403 Free tier users do not have access to this model` (`no_providers_available`) from `ai-gateway.vercel.sh/v1/evaluate`. The digest still went out, ranked without Jev. From 20 to 25 Sep, 55–75% of calls already failed with `429` (free-tier rate limit) or `503`.
+
+Vercel AI Gateway's free tier only serves a subset of models and rate-limits them; other models need purchased AI Gateway Credits ([pricing](https://vercel.com/docs/ai-gateway/pricing)). TypeSafe documents direct access at `api.typesafe.ai/v1/systemone` with a key from `console.typesafe.ai/keys` ([API](https://docs.typesafe.ai/api.md)). The direct key used on 18 Sep returned `401` on 19 Sep.
+
+**Landed:** 429/5xx calls retry with backoff. After a 401/403/404 the run stops sending requests and marks the rest "not sent". The Jev tab marks failed runs in red and shows one banner with the cause.
+
+**Still open:** access. Either buy AI Gateway Credits or put a working TypeSafe key in `TYPESAFE_API_KEY`.
+
 ## Antigravity flakes during the daily run
 
 **Expected:** Filter, summaries, and covers come back from `agy`.  
@@ -29,13 +40,6 @@ The feed stays enabled in the dashboard. Hypothesis: AP is blocking the default 
 
 **Expected:** When the direct article fetch is thin, archive.is → 1ft.io → archive.org → removepaywall.com recover the text.  
 **Actual:** Daily stats show archive.is, 1ft.io, and removepaywall at ~0%. archive.org sometimes recovers a batch (about 14/18 on 30 August). Overall full-text rate is still high because most articles succeed on the first request.
-
-## Books toggle is a text box
-
-**Expected:** `books_delivery_enabled` is a checkbox, like Kindle delivery and the Gmail/Calendar flags.  
-**Actual:** The Settings tab renders it as a text field with the string `true`. The `books` group also has no friendly label (it shows as “books”).
-
-Hypothesis: `BOOL_KEYS` and `GROUP_LABELS` in the dashboard script were not updated when the iCloud Books settings were added. Saving the word `true` may still work; saving anything else would not.
 
 ## Dashboard reads have no token
 
