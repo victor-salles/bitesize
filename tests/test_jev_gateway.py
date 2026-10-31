@@ -94,3 +94,75 @@ def test_classify_article_posts_evaluate_on_gateway(monkeypatch):
     assert seen["model"] == "typesafe-ai/jev"
     assert seen["auth"] == "Bearer vck_test"
     assert out["skip"] is False
+
+
+class FakeResponse:
+    def __init__(self, status, body="", headers=None):
+        self.status_code = status
+        self.text = body
+        self.headers = headers or {}
+
+    def json(self):
+        return {"ok": True}
+
+
+def test_gateway_post_retries_rate_limits_then_succeeds(monkeypatch):
+    replies = [FakeResponse(429, "busy"), FakeResponse(503, "down"), FakeResponse(200)]
+    sleeps = []
+    monkeypatch.setattr(jev_triage, "_http_post", lambda *a, **k: replies.pop(0))
+    monkeypatch.setattr(jev_triage.time, "sleep", sleeps.append)
+    assert jev_triage.gateway_post("u", json={}, headers={}) == {"ok": True}
+    assert sleeps == [1.0, 2.0]
+
+
+def test_gateway_post_honors_retry_after(monkeypatch):
+    replies = [FakeResponse(429, "busy", {"retry-after": "7"}), FakeResponse(200)]
+    sleeps = []
+    monkeypatch.setattr(jev_triage, "_http_post", lambda *a, **k: replies.pop(0))
+    monkeypatch.setattr(jev_triage.time, "sleep", sleeps.append)
+    jev_triage.gateway_post("u", json={}, headers={})
+    assert sleeps == [7.0]
+
+
+def test_gateway_post_does_not_retry_access_errors(monkeypatch):
+    calls = []
+
+    def post(*a, **k):
+        calls.append(1)
+        return FakeResponse(403, '{"error":"Free tier users do not have access"}')
+
+    monkeypatch.setattr(jev_triage, "_http_post", post)
+    monkeypatch.setattr(jev_triage.time, "sleep", lambda s: None)
+    try:
+        jev_triage.gateway_post("u", json={}, headers={})
+    except jev_triage.GatewayError as exc:
+        assert exc.status == 403
+        assert jev_triage.is_access_error(exc)
+    else:
+        raise AssertionError("expected GatewayError")
+    assert len(calls) == 1
+
+
+def test_gateway_post_gives_up_after_retries(monkeypatch):
+    calls = []
+
+    def post(*a, **k):
+        calls.append(1)
+        return FakeResponse(429, "busy")
+
+    monkeypatch.setattr(jev_triage, "_http_post", post)
+    monkeypatch.setattr(jev_triage.time, "sleep", lambda s: None)
+    try:
+        jev_triage.gateway_post("u", json={}, headers={})
+    except jev_triage.GatewayError as exc:
+        assert exc.status == 429
+        assert not jev_triage.is_access_error(exc)
+    assert len(calls) == jev_triage.GATEWAY_RETRIES + 1
+
+
+def test_sdk_auth_errors_count_as_access_errors():
+    from typesafe_sdk import TypeSafeAuthenticationError, TypeSafePermissionDeniedError
+
+    for cls in (TypeSafeAuthenticationError, TypeSafePermissionDeniedError):
+        exc = cls.__new__(cls)
+        assert jev_triage.is_access_error(exc)

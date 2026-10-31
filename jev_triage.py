@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable
 
@@ -16,6 +18,26 @@ from tags import normalize_tags
 MAX_WORKERS = 32
 GATEWAY_BASE_URL = "https://ai-gateway.vercel.sh"
 GATEWAY_EVALUATE_PATH = "/v1/evaluate"
+GATEWAY_RETRIES = 3
+# Statuses that will not succeed on retry: bad key, plan without access, wrong endpoint.
+ACCESS_STATUSES = {401, 403, 404}
+ACCESS_SDK_ERRORS = {
+    "TypeSafeAuthenticationError",
+    "TypeSafePermissionDeniedError",
+    "TypeSafeNotFoundError",
+}
+
+
+class GatewayError(RuntimeError):
+    def __init__(self, status: int, message: str) -> None:
+        super().__init__(message)
+        self.status = status
+
+
+def is_access_error(exc: BaseException) -> bool:
+    if isinstance(exc, GatewayError):
+        return exc.status in ACCESS_STATUSES
+    return type(exc).__name__ in ACCESS_SDK_ERRORS
 
 
 def _api_key() -> str:
@@ -96,14 +118,32 @@ def response_from_evaluate(payload: dict[str, Any]) -> Any:
     )
 
 
-def gateway_post(url: str, *, json: dict[str, Any], headers: dict[str, str]) -> dict[str, Any]:
+def _http_post(url: str, *, json: dict[str, Any], headers: dict[str, str]) -> Any:
     import httpx2
 
-    response = httpx2.post(url, json=json, headers=headers, timeout=60.0)
-    if response.status_code >= 400:
-        snippet = (response.text or "").strip()[:300]
-        raise RuntimeError(f"POST {url}: {response.status_code} {snippet}")
-    return response.json()
+    return httpx2.post(url, json=json, headers=headers, timeout=60.0)
+
+
+def _retry_delay(response: Any, attempt: int) -> float:
+    raw = (getattr(response, "headers", None) or {}).get("retry-after")
+    try:
+        return min(float(raw), 30.0)
+    except (TypeError, ValueError):
+        return float(2**attempt)
+
+
+def gateway_post(url: str, *, json: dict[str, Any], headers: dict[str, str]) -> dict[str, Any]:
+    for attempt in range(GATEWAY_RETRIES + 1):
+        response = _http_post(url, json=json, headers=headers)
+        status = response.status_code
+        if status < 400:
+            return response.json()
+        retryable = status == 429 or status >= 500
+        if not retryable or attempt == GATEWAY_RETRIES:
+            snippet = (response.text or "").strip()[:300]
+            raise GatewayError(status, f"POST {url}: {status} {snippet}")
+        time.sleep(_retry_delay(response, attempt))
+    raise AssertionError("unreachable")
 
 
 def call_evaluate(state: Any, questions: dict[str, Any]) -> Any:
@@ -218,6 +258,8 @@ def classify_article(
         out = art.copy()
         out["skip"] = False
         out["jev_error"] = f"{type(exc).__name__}: {exc}"
+        if is_access_error(exc):
+            out["_jev_fatal"] = True
         return out
 
 
@@ -230,9 +272,21 @@ def classify_articles(
         return []
     workers = min(worker_count(), len(articles))
     out: list[dict | None] = [None] * len(articles)
+    # After an access error every other call fails the same way; stop sending them.
+    denied: list[str] = []
+    stop = threading.Event()
 
     def _one(index: int, art: dict) -> tuple[int, dict]:
-        return index, classify_article(art, system_one=system_one)
+        if stop.is_set():
+            skipped = art.copy()
+            skipped["skip"] = False
+            skipped["jev_error"] = f"Not sent after access error: {denied[0]}"
+            return index, skipped
+        classified = classify_article(art, system_one=system_one)
+        if classified.pop("_jev_fatal", False) and not stop.is_set():
+            denied.append(classified["jev_error"])
+            stop.set()
+        return index, classified
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = [pool.submit(_one, i, art) for i, art in enumerate(articles)]
@@ -246,4 +300,8 @@ def classify_articles(
         f"  Jev run saved: {run['path']} "
         f"({run['kept']} kept, {run['skipped']} skipped, {run['errors']} errors)"
     )
+    if denied:
+        console.print(
+            f"  [bold red]Jev access refused; no stories were scored after it.[/] {denied[0][:200]}"
+        )
     return rows

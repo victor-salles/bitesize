@@ -188,3 +188,46 @@ def test_classify_articles_keeps_order(monkeypatch):
     assert [item["title"] for item in loaded["items"]] == ["A", "B"]
     assert loaded["items"][0]["jev"]["answers"]["ad"] >= 0
     assert "keep" not in loaded["items"][0]["jev"]["answers"]
+
+
+def test_classify_articles_stops_calling_after_access_error(monkeypatch):
+    monkeypatch.setattr(
+        jev_triage,
+        "get_settings",
+        lambda: MagicMock(jev_triage_enabled=True, jev_min_keep=0, jev_workers=1),
+    )
+    calls = []
+
+    def denied(**kwargs):
+        calls.append(1)
+        raise jev_triage.GatewayError(403, "POST x: 403 Free tier users do not have access")
+
+    arts = [{"title": t, "content": "body", "source": "S"} for t in "ABCDE"]
+    out = jev_triage.classify_articles(arts, system_one=denied)
+    assert len(calls) == 1
+    assert all(a["jev_error"].startswith("GatewayError") for a in out[:1])
+    assert all(a["jev_error"].startswith("Not sent") for a in out[1:])
+    assert all("_jev_fatal" not in a for a in out)
+    run = jev_log.load_run(jev_log.list_runs()[0]["id"])
+    assert run["errors"] == 5
+
+
+def test_classify_articles_keeps_going_after_transient_error(monkeypatch):
+    monkeypatch.setattr(
+        jev_triage,
+        "get_settings",
+        lambda: MagicMock(jev_triage_enabled=True, jev_min_keep=0, jev_workers=1),
+    )
+    calls = []
+
+    def flaky(**kwargs):
+        calls.append(1)
+        if len(calls) == 1:
+            raise jev_triage.GatewayError(429, "POST x: 429 busy")
+        return _response()
+
+    arts = [{"title": t, "content": "body", "source": "S"} for t in "ABC"]
+    out = jev_triage.classify_articles(arts, system_one=flaky)
+    assert len(calls) == 3
+    assert "jev_error" in out[0]
+    assert all("jev_error" not in a for a in out[1:])
