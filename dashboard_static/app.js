@@ -1,12 +1,24 @@
-const GROUP_LABELS = {
-  ai: "AI",
-  feed: "Feed fetching",
-  filter: "Article filters",
-  epub: "EPUB layout",
-  integrations: "Integrations",
-  cli: "CLI defaults",
-  kindle: "Kindle delivery",
+const GROUP_ORDER = ["integrations", "ai", "books", "feed", "filter", "epub", "cli"];
+
+const FIELD_UNITS = {
+  gemini_timeout: "unitSeconds",
+  gemini_check_timeout: "unitSeconds",
+  ollama_timeout: "unitSeconds",
+  feed_timeout: "unitSeconds",
+  calendar_lookahead_days: "unitDays",
+  calendar_lookback_days: "unitDays",
+  gmail_lookback_hours: "unitHours",
+  truncate_chars: "unitChars",
+  min_body_chars: "unitChars",
+  min_summary_chars: "unitChars",
 };
+
+const FIELD_CHOICES = {
+  ai_backend: ["antigravity", "gemini", "ollama"],
+};
+
+// TODO(human): list the settings keys that belong under "Advanced".
+const ADVANCED_SETTINGS = new Set([]);
 
 const BOOL_KEYS = new Set([
   "kindle_delivery_enabled",
@@ -83,7 +95,7 @@ function applyStaticI18n() {
     'label[for="dashboard-token"]': "tokenLabel",
     "#save-settings": "saveSettings",
     "#run-digest": "runDigest",
-    "#digest-hint": "digestHint",
+    "#token-help": "tokenHelp",
     "#panel-jev .preview-intro": "jevIntro",
     "#refresh-jev": "reloadRuns",
     "#export-jev-labels": "exportLabels",
@@ -96,6 +108,9 @@ function applyStaticI18n() {
   }
   const tokenEl = $("#dashboard-token");
   if (tokenEl) tokenEl.placeholder = t("tokenPlaceholder");
+  const runBtn = $("#run-digest");
+  if (runBtn) runBtn.title = t("digestHint");
+  paintTokenSummary();
   const tabKeys = {
     settings: "tabSettings",
     sources: "tabSources",
@@ -114,6 +129,14 @@ function dashboardToken() {
   const v = (el?.value || localStorage.getItem(TOKEN_KEY) || "").trim();
   if (el && v && !el.value) el.value = v;
   return v;
+}
+
+function paintTokenSummary() {
+  const summary = $("#token-summary");
+  if (!summary) return;
+  const set = !!dashboardToken();
+  summary.textContent = t(set ? "tokenSet" : "tokenMissing");
+  summary.classList.toggle("is-missing", !set);
 }
 
 function authHeaders() {
@@ -143,8 +166,66 @@ function setStatus(el, msg, ok) {
   el.className = "status" + (msg ? (ok ? " ok" : " err") : "");
 }
 
+function fieldLabel(key) {
+  const k = `f_${key}`;
+  const s = t(k);
+  return s === k ? key.replace(/_/g, " ") : s;
+}
+
+function fieldHint(key) {
+  const k = `h_${key}`;
+  const s = t(k);
+  return s === k ? "" : s;
+}
+
+function settingsField(key, value) {
+  const row = document.createElement("div");
+  const input = inputForKey(key, value);
+  input.id = `set-${key}`;
+  const hint = fieldHint(key);
+  if (input.type === "checkbox") {
+    row.className = "field field--toggle";
+    const label = document.createElement("label");
+    label.htmlFor = input.id;
+    label.className = "field__label";
+    label.textContent = fieldLabel(key);
+    row.append(input, label);
+  } else {
+    row.className = "field";
+    const label = document.createElement("label");
+    label.htmlFor = input.id;
+    label.className = "field__label";
+    label.textContent = fieldLabel(key);
+    const control = document.createElement("div");
+    control.className = "field__control";
+    control.appendChild(input);
+    if (FIELD_UNITS[key]) {
+      const unit = document.createElement("span");
+      unit.className = "field__unit";
+      unit.textContent = t(FIELD_UNITS[key]);
+      control.appendChild(unit);
+    }
+    row.append(label, control);
+  }
+  if (hint) {
+    const p = document.createElement("p");
+    p.className = "field__hint";
+    p.id = `${input.id}-hint`;
+    p.textContent = hint;
+    input.setAttribute("aria-describedby", p.id);
+    row.appendChild(p);
+  }
+  return row;
+}
+
 function inputForKey(key, value) {
-  if (BOOL_KEYS.has(key)) {
+  if (FIELD_CHOICES[key]) {
+    const sel = document.createElement("select");
+    for (const v of FIELD_CHOICES[key]) sel.add(new Option(v, v, false, v === value));
+    sel.dataset.key = key;
+    return sel;
+  }
+  if (BOOL_KEYS.has(key) || typeof value === "boolean") {
     const cb = document.createElement("input");
     cb.type = "checkbox";
     cb.checked = !!value;
@@ -164,26 +245,33 @@ function inputForKey(key, value) {
 function renderSettingsGroups() {
   const root = $("#settings-groups");
   root.innerHTML = "";
-  for (const [group, fields] of Object.entries(settingsData)) {
-    if (group === "kindle") continue;
-    const card = document.createElement("div");
-    card.className = "group";
-    const title = document.createElement("h2");
-    title.textContent = GROUP_LABELS[group] || group;
-    card.appendChild(title);
-    for (const [key, value] of Object.entries(fields)) {
-      const row = document.createElement("div");
-      row.className = "field";
-      const label = document.createElement("label");
-      label.textContent = key.replace(/_/g, " ");
-      label.htmlFor = key;
-      const input = inputForKey(key, value);
-      input.id = key;
-      row.append(label, input);
-      card.appendChild(row);
+  const rank = (g) => (GROUP_ORDER.includes(g) ? GROUP_ORDER.indexOf(g) : GROUP_ORDER.length);
+  const groups = Object.keys(settingsData)
+    .filter((g) => g !== "kindle")
+    .sort((a, b) => rank(a) - rank(b));
+  const advanced = document.createElement("details");
+  advanced.className = "group group--advanced";
+  advanced.innerHTML = `<summary>${esc(t("advancedSettings"))}</summary>`;
+  for (const group of groups) {
+    const entries = Object.entries(settingsData[group]);
+    const basic = entries.filter(([k]) => !ADVANCED_SETTINGS.has(k));
+    const extra = entries.filter(([k]) => ADVANCED_SETTINGS.has(k));
+    if (basic.length) {
+      const card = document.createElement("div");
+      card.className = "group";
+      card.innerHTML = `<h2>${esc(t(`g_${group}`))}</h2>`;
+      basic.forEach(([k, v]) => card.appendChild(settingsField(k, v)));
+      root.appendChild(card);
     }
-    root.appendChild(card);
+    if (extra.length) {
+      const sub = document.createElement("div");
+      sub.className = "group__sub";
+      sub.innerHTML = `<h3>${esc(t(`g_${group}`))}</h3>`;
+      extra.forEach(([k, v]) => sub.appendChild(settingsField(k, v)));
+      advanced.appendChild(sub);
+    }
   }
+  if (advanced.children.length > 1) root.appendChild(advanced);
 }
 
 function renderKindleFields() {
@@ -192,16 +280,12 @@ function renderKindleFields() {
   const fields = settingsData.kindle || {};
   for (const key of KINDLE_KEYS) {
     if (key === "smtp_password_set") continue;
-    const row = document.createElement("div");
-    row.className = "field";
-    const label = document.createElement("label");
-    label.textContent = key.replace(/_/g, " ");
-    const input = inputForKey(key, fields[key]);
+    const row = settingsField(key, fields[key]);
+    const input = row.querySelector("[data-key]");
     if (key === "smtp_password" && fields.smtp_password_set && !fields[key]) {
       input.placeholder = "•••••••• (unchanged)";
     }
     input.dataset.kindle = "1";
-    row.append(label, input);
     root.appendChild(row);
   }
 }
@@ -221,10 +305,7 @@ function collectInputs(container) {
 function paintLangSwitcher() {
   const current = uiLang();
   $$("#ui-lang-switch [data-ui-lang]").forEach((btn) => {
-    const on = btn.dataset.uiLang === current;
-    btn.classList.toggle("ring-2", on);
-    btn.classList.toggle("ring-slate-400", on);
-    btn.classList.toggle("font-semibold", on);
+    btn.setAttribute("aria-pressed", String(btn.dataset.uiLang === current));
   });
 }
 
@@ -233,6 +314,10 @@ function setUiLang(lang, { persist = false } = {}) {
   if (persist) localStorage.setItem(LANG_KEY, uiLangCode);
   applyStaticI18n();
   paintLangSwitcher();
+  if (Object.keys(settingsData).length) {
+    renderSettingsGroups();
+    renderKindleFields();
+  }
   if (jevThemesDraft.length) renderJevThemeEditor();
   if (jevOpenRun) {
     const snap = { ...jevFilter };
@@ -280,13 +365,16 @@ function paintDigestProgress(data) {
   const log = $("#digest-log");
   const btn = $("#run-digest");
   if (!list || !data) return;
+  paintLastDigest(data.last_digest);
+  const progress = $("#digest-progress");
+  if (progress) progress.hidden = (data.status || "idle") === "idle";
   const mark = { pending: "○", running: "●", done: "✓", skipped: "–", error: "✕" };
   const color = {
-    pending: "text-slate-400",
+    pending: "text-slate-500",
     running: "text-sky-700 font-medium",
     done: "text-emerald-700",
-    skipped: "text-slate-400",
-    error: "text-rose-600",
+    skipped: "text-slate-500",
+    error: "text-rose-700",
   };
   list.innerHTML = (data.steps || [])
     .map((s) => {
@@ -299,14 +387,9 @@ function paintDigestProgress(data) {
     .join("");
   const lines = (data.lines || []).slice(-16);
   if (log) {
-    if (lines.length) {
-      log.classList.remove("hidden");
-      log.textContent = lines.join("\n");
-      log.scrollTop = log.scrollHeight;
-    } else {
-      log.classList.add("hidden");
-      log.textContent = "";
-    }
+    log.hidden = !lines.length;
+    log.textContent = lines.join("\n");
+    if (lines.length) log.scrollTop = log.scrollHeight;
   }
   if (btn) btn.disabled = data.status === "running";
   const st = $("#digest-run-status");
@@ -314,6 +397,24 @@ function paintDigestProgress(data) {
   if (data.status === "running") setStatus(st, t("digestRunning"), true);
   else if (data.status === "done") setStatus(st, t("digestDone"), true);
   else if (data.status === "error") setStatus(st, data.error || t("digestFailed"), false);
+}
+
+function paintLastDigest(last) {
+  const el = $("#last-digest");
+  if (!el) return;
+  if (!last) {
+    el.textContent = t("lastDigestNone");
+    return;
+  }
+  const when = new Date(last.finished_at).toLocaleString(uiLangCode === "pt" ? "pt-BR" : "en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  el.textContent = t("lastDigest", { when });
+  el.title = last.file;
 }
 
 function startDigestPoll() {
@@ -388,82 +489,139 @@ async function saveSettings(container, statusEl) {
   }
 }
 
+function rowMenu(label, items) {
+  const menu = document.createElement("details");
+  menu.className = "row-menu";
+  const summary = document.createElement("summary");
+  summary.setAttribute("aria-label", label);
+  summary.textContent = "⋯";
+  const pop = document.createElement("div");
+  pop.className = "row-menu__pop";
+  for (const { text, danger, onClick } of items) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = text;
+    if (danger) b.className = "danger";
+    b.onclick = () => {
+      menu.open = false;
+      onClick();
+    };
+    pop.appendChild(b);
+  }
+  menu.append(summary, pop);
+  return menu;
+}
+
+function textInput(value, label, placeholder = "") {
+  const input = document.createElement("input");
+  input.type = "text";
+  input.value = value;
+  input.placeholder = placeholder;
+  input.setAttribute("aria-label", label);
+  return input;
+}
+
+async function saveFeed(feed, name, url, enabled) {
+  const status = $("#sources-status");
+  try {
+    await api(`/api/feeds/${feed.id}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        name: name.value.trim(),
+        url: url.value.trim(),
+        enabled: enabled.checked,
+      }),
+    });
+    setStatus(status, t("feedSaved", { name: name.value.trim() }), true);
+  } catch (e) {
+    setStatus(status, e.message, false);
+  }
+}
+
 function renderSources(data) {
   const root = $("#sources-list");
   root.innerHTML = "";
   for (const cat of data.categories) {
     const card = document.createElement("div");
-    card.className = "card";
+    card.className = "card source-card";
     const header = document.createElement("div");
     header.className = "category-header";
-    const nameInput = document.createElement("input");
-    nameInput.type = "text";
-    nameInput.value = cat.name;
-    const saveCat = document.createElement("button");
-    saveCat.textContent = "Rename";
-    saveCat.onclick = async () => {
-      await api(`/api/categories/${cat.id}`, {
-        method: "PUT",
-        body: JSON.stringify({ name: nameInput.value.trim() }),
-      });
-      await refreshSources();
-    };
-    const delCat = document.createElement("button");
-    delCat.textContent = "Delete";
-    delCat.className = "danger";
-    delCat.onclick = async () => {
-      if (!confirm(`Delete category "${cat.name}" and all feeds?`)) return;
-      await api(`/api/categories/${cat.id}`, { method: "DELETE" });
-      await refreshSources();
-    };
-    header.append(nameInput, saveCat, delCat);
+    const nameInput = textInput(cat.name, t("categoryName"));
+    nameInput.className = "category-header__name";
+    nameInput.addEventListener("change", async () => {
+      try {
+        await api(`/api/categories/${cat.id}`, {
+          method: "PUT",
+          body: JSON.stringify({ name: nameInput.value.trim() }),
+        });
+        setStatus($("#sources-status"), t("categorySaved", { name: nameInput.value.trim() }), true);
+      } catch (e) {
+        setStatus($("#sources-status"), e.message, false);
+      }
+    });
+    const count = document.createElement("span");
+    count.className = "category-header__count";
+    count.textContent = `${cat.feeds.filter((f) => f.enabled).length}/${cat.feeds.length}`;
+    header.append(
+      nameInput,
+      count,
+      rowMenu(t("moreActions"), [
+        {
+          text: t("deleteCategory"),
+          danger: true,
+          onClick: async () => {
+            if (!confirm(`Delete category "${cat.name}" and all feeds?`)) return;
+            await api(`/api/categories/${cat.id}`, { method: "DELETE" });
+            await refreshSources();
+          },
+        },
+      ]),
+    );
     card.appendChild(header);
 
     for (const feed of cat.feeds) {
       const row = document.createElement("div");
-      row.className = "feed-row";
-      const name = document.createElement("input");
-      name.type = "text";
-      name.value = feed.name;
-      const url = document.createElement("input");
-      url.type = "text";
-      url.value = feed.url;
+      row.className = "feed-row" + (feed.enabled ? "" : " is-off");
+      const name = textInput(feed.name, t("feedName"));
+      const url = textInput(feed.url, t("feedUrl"));
+      url.classList.add("feed-row__url");
+      const toggle = document.createElement("label");
+      toggle.className = "feed-row__toggle";
       const enabled = document.createElement("input");
       enabled.type = "checkbox";
       enabled.checked = feed.enabled;
-      enabled.title = "Enabled";
-      const save = document.createElement("button");
-      save.textContent = "Save";
-      save.onclick = async () => {
-        await api(`/api/feeds/${feed.id}`, {
-          method: "PUT",
-          body: JSON.stringify({
-            name: name.value.trim(),
-            url: url.value.trim(),
-            enabled: enabled.checked,
-          }),
-        });
-        setStatus($("#sources-status"), "Feed saved.", true);
-      };
-      const del = document.createElement("button");
-      del.textContent = "Delete";
-      del.className = "danger";
-      del.onclick = async () => {
-        await api(`/api/feeds/${feed.id}`, { method: "DELETE" });
-        await refreshSources();
-      };
-      row.append(name, url, enabled, save, del);
+      toggle.append(enabled, document.createTextNode(t("feedOn")));
+      const save = () => saveFeed(feed, name, url, enabled);
+      name.addEventListener("change", save);
+      url.addEventListener("change", save);
+      enabled.addEventListener("change", () => {
+        row.classList.toggle("is-off", !enabled.checked);
+        save();
+      });
+      row.append(
+        name,
+        url,
+        toggle,
+        rowMenu(t("moreActions"), [
+          {
+            text: t("deleteFeed"),
+            danger: true,
+            onClick: async () => {
+              await api(`/api/feeds/${feed.id}`, { method: "DELETE" });
+              await refreshSources();
+            },
+          },
+        ]),
+      );
       card.appendChild(row);
     }
 
     const addRow = document.createElement("div");
     addRow.className = "feed-add";
-    const newName = document.createElement("input");
-    newName.placeholder = "Feed name";
-    const newUrl = document.createElement("input");
-    newUrl.placeholder = "RSS URL";
+    const newName = textInput("", t("feedName"), t("feedName"));
+    const newUrl = textInput("", t("feedUrl"), t("feedUrl"));
     const addBtn = document.createElement("button");
-    addBtn.textContent = "Add feed";
+    addBtn.textContent = t("addFeed");
     addBtn.onclick = async () => {
       await api("/api/feeds", {
         method: "POST",
@@ -473,8 +631,6 @@ function renderSources(data) {
           url: newUrl.value.trim(),
         }),
       });
-      newName.value = "";
-      newUrl.value = "";
       await refreshSources();
     };
     addRow.append(newName, newUrl, addBtn);
@@ -508,11 +664,24 @@ function defaultJevFilter() {
   };
 }
 
-$$(".tab").forEach((btn) => {
+$$(".tab").forEach((btn, i, tabs) => {
+  btn.addEventListener("keydown", (e) => {
+    const step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+    if (!step) return;
+    const next = tabs[(i + step + tabs.length) % tabs.length];
+    next.focus();
+    next.click();
+  });
   btn.addEventListener("click", () => {
-    $$(".tab").forEach((b) => b.classList.remove("active"));
+    $$(".tab").forEach((b) => {
+      b.classList.remove("active");
+      b.setAttribute("aria-selected", "false");
+      b.tabIndex = -1;
+    });
     $$(".panel").forEach((p) => p.classList.remove("active"));
     btn.classList.add("active");
+    btn.setAttribute("aria-selected", "true");
+    btn.tabIndex = 0;
     $(`#panel-${btn.dataset.tab}`).classList.add("active");
     document.body.classList.toggle("jev-wide", btn.dataset.tab === "jev");
     if (btn.dataset.tab === "preview" && !previewLoaded) {
@@ -685,41 +854,55 @@ function renumberJevThemesDraft() {
   });
 }
 
+function moveJevTheme(from, to) {
+  if (from === to || from < 0 || to < 0) return;
+  if (from >= jevThemesDraft.length || to >= jevThemesDraft.length) return;
+  const [item] = jevThemesDraft.splice(from, 1);
+  jevThemesDraft.splice(to, 0, item);
+  renumberJevThemesDraft();
+}
+
+const THEME_HANDLE_ICON =
+  '<svg width="12" height="16" viewBox="0 0 12 16" aria-hidden="true"><circle cx="3" cy="3" r="1.35" fill="currentColor"/><circle cx="9" cy="3" r="1.35" fill="currentColor"/><circle cx="3" cy="8" r="1.35" fill="currentColor"/><circle cx="9" cy="8" r="1.35" fill="currentColor"/><circle cx="3" cy="13" r="1.35" fill="currentColor"/><circle cx="9" cy="13" r="1.35" fill="currentColor"/></svg>';
+
 function renderJevThemeEditor() {
   const root = $("#jev-theme-editor");
   if (!root) return;
-  const n = jevThemesDraft.length;
   const rows = jevThemesDraft
-    .map(
-      (th, i) => `<tr class="border-b border-slate-100" data-theme-i="${i}">
-      <td class="py-2 pr-2 text-xs tabular-nums text-slate-400 w-8">${i + 1}</td>
-      <td class="py-2 pr-2"><input type="text" data-theme-field="label_en" data-theme-i="${i}" value="${esc(th.label_en)}"
-        class="w-full min-w-[7rem] rounded-md border border-slate-200 px-2 py-1 text-xs"></td>
-      <td class="py-2 pr-2"><input type="text" data-theme-field="label_pt" data-theme-i="${i}" value="${esc(th.label_pt)}"
-        class="w-full min-w-[7rem] rounded-md border border-slate-200 px-2 py-1 text-xs"></td>
-      <td class="py-2 pr-2 whitespace-nowrap">
-        <button type="button" data-theme-up="${i}" class="rounded border border-slate-200 px-1.5 text-xs" ${i === 0 ? "disabled" : ""}>↑</button>
-        <button type="button" data-theme-down="${i}" class="rounded border border-slate-200 px-1.5 text-xs ml-1" ${i === n - 1 ? "disabled" : ""}>↓</button>
-      </td>
-      <td class="py-2 text-center"><input type="checkbox" data-theme-enabled="${i}" ${th.enabled ? "checked" : ""}></td>
-    </tr>`
-    )
+    .map((th, i) => {
+      const off = th.enabled ? "" : " is-off";
+      return `<div class="theme-row${off}" data-theme-row data-theme-i="${i}">
+      <input type="checkbox" class="theme-row__on" data-theme-enabled="${i}" ${th.enabled ? "checked" : ""}
+        aria-label="${esc(t("themeEnabled"))}">
+      <button type="button" class="theme-row__handle" data-theme-handle
+        aria-label="${esc(t("dragTheme"))}">${THEME_HANDLE_ICON}</button>
+      <span class="theme-row__rank">${i + 1}</span>
+      <label class="theme-row__cell theme-row__en">
+        <input type="text" class="theme-row__field" data-theme-field="label_en" data-theme-i="${i}"
+          value="${esc(th.label_en)}" aria-label="${esc(t("themeLabelEn"))}">
+      </label>
+      <label class="theme-row__cell theme-row__pt">
+        <input type="text" class="theme-row__field" data-theme-field="label_pt" data-theme-i="${i}"
+          value="${esc(th.label_pt)}" aria-label="${esc(t("themeLabelPt"))}">
+      </label>
+    </div>`;
+    })
     .join("");
-  root.innerHTML = `<h3 class="text-sm font-medium text-slate-800 m-0 mb-1">${esc(t("themeEditorTitle"))}</h3>
-    <p class="text-xs text-slate-500 m-0 mb-3">${esc(t("ranksNextDigest"))}</p>
-    <table class="w-full text-left text-sm">
-      <thead><tr class="text-xs text-slate-500 border-b border-slate-200">
-        <th class="pb-2 pr-2 font-medium">#</th>
-        <th class="pb-2 pr-2 font-medium">${esc(t("themeLabelEn"))}</th>
-        <th class="pb-2 pr-2 font-medium">${esc(t("themeLabelPt"))}</th>
-        <th class="pb-2 pr-2 font-medium"></th>
-        <th class="pb-2 font-medium text-center">${esc(t("themeEnabled"))}</th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <div class="flex flex-wrap gap-2 mt-3">
-      <button type="button" id="jev-theme-add" class="rounded-md border border-slate-200 px-3 py-1.5 text-xs">${esc(t("addTheme"))}</button>
-      <button type="button" id="jev-theme-save" class="primary text-xs">${esc(t("saveThemes"))}</button>
+  root.innerHTML = `<h3 class="theme-editor__title">${esc(t("themeEditorTitle"))}</h3>
+    <p class="theme-editor__hint">${esc(t("ranksNextDigest"))}</p>
+    <div class="theme-list">
+      <div class="theme-list__head" aria-hidden="true">
+        <span>${esc(t("themeEnabled"))}</span>
+        <span></span>
+        <span>#</span>
+        <span>${esc(t("themeLabelEn"))}</span>
+        <span>${esc(t("themeLabelPt"))}</span>
+      </div>
+      ${rows}
+    </div>
+    <div class="theme-editor__actions">
+      <button type="button" id="jev-theme-add">${esc(t("addTheme"))}</button>
+      <button type="button" id="jev-theme-save" class="primary">${esc(t("saveThemes"))}</button>
     </div>`;
 
   root.querySelectorAll("[data-theme-field]").forEach((input) => {
@@ -732,27 +915,12 @@ function renderJevThemeEditor() {
   root.querySelectorAll("[data-theme-enabled]").forEach((box) => {
     box.addEventListener("change", () => {
       const i = Number(box.dataset.themeEnabled);
-      if (jevThemesDraft[i]) jevThemesDraft[i].enabled = box.checked;
+      if (!jevThemesDraft[i]) return;
+      jevThemesDraft[i].enabled = box.checked;
+      box.closest(".theme-row")?.classList.toggle("is-off", !box.checked);
     });
   });
-  root.querySelectorAll("[data-theme-up]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const i = Number(btn.dataset.themeUp);
-      if (i <= 0) return;
-      [jevThemesDraft[i - 1], jevThemesDraft[i]] = [jevThemesDraft[i], jevThemesDraft[i - 1]];
-      renumberJevThemesDraft();
-      renderJevThemeEditor();
-    });
-  });
-  root.querySelectorAll("[data-theme-down]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const i = Number(btn.dataset.themeDown);
-      if (i >= jevThemesDraft.length - 1) return;
-      [jevThemesDraft[i], jevThemesDraft[i + 1]] = [jevThemesDraft[i + 1], jevThemesDraft[i]];
-      renumberJevThemesDraft();
-      renderJevThemeEditor();
-    });
-  });
+  bindThemeDrag(root);
   $("#jev-theme-add").onclick = () => {
     jevThemesDraft.push({
       id: "",
@@ -765,6 +933,61 @@ function renderJevThemeEditor() {
   };
   $("#jev-theme-save").onclick = () =>
     saveJevThemes().catch((e) => setStatus($("#jev-status"), e.message, false));
+}
+
+function bindThemeDrag(root) {
+  root.querySelectorAll("[data-theme-row]").forEach((row) => {
+    const handle = row.querySelector("[data-theme-handle]");
+    if (!handle) return;
+    handle.addEventListener("pointerdown", () => {
+      row.setAttribute("draggable", "true");
+    });
+    row.addEventListener("dragstart", (e) => {
+      if (!row.getAttribute("draggable")) {
+        e.preventDefault();
+        return;
+      }
+      const from = Number(row.dataset.themeI);
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", String(from));
+      row.classList.add("is-dragging");
+    });
+    row.addEventListener("dragend", () => {
+      row.removeAttribute("draggable");
+      root.querySelectorAll(".theme-row").forEach((r) => r.classList.remove("is-dragging", "is-drop-target"));
+    });
+    handle.addEventListener("keydown", (e) => {
+      const i = Number(row.dataset.themeI);
+      if (e.key === "ArrowUp" && i > 0) {
+        e.preventDefault();
+        moveJevTheme(i, i - 1);
+        renderJevThemeEditor();
+        root.querySelector(`[data-theme-i="${i - 1}"] [data-theme-handle]`)?.focus();
+      }
+      if (e.key === "ArrowDown" && i < jevThemesDraft.length - 1) {
+        e.preventDefault();
+        moveJevTheme(i, i + 1);
+        renderJevThemeEditor();
+        root.querySelector(`[data-theme-i="${i + 1}"] [data-theme-handle]`)?.focus();
+      }
+    });
+    row.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      row.classList.add("is-drop-target");
+    });
+    row.addEventListener("dragleave", (e) => {
+      if (!row.contains(e.relatedTarget)) row.classList.remove("is-drop-target");
+    });
+    row.addEventListener("drop", (e) => {
+      e.preventDefault();
+      row.classList.remove("is-drop-target");
+      const from = Number(e.dataTransfer.getData("text/plain"));
+      const to = Number(row.dataset.themeI);
+      moveJevTheme(from, to);
+      renderJevThemeEditor();
+    });
+  });
 }
 
 async function loadJevThemes() {
@@ -832,10 +1055,10 @@ function tipoEditor(item, i) {
   const btn = (value, label, onCls, offCls) => {
     const on = tipoVal === value;
     return `<button type="button" data-jev-label="tipo" data-jev-i="${i}" data-value="${value}"
-      class="inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${on ? onCls : offCls}">${label}</button>`;
+      class="chip ${on ? onCls : offCls}">${label}</button>`;
   };
-  return `<div class="flex gap-1">${btn("artigo-completo", t("tipoCompleto"), "bg-amber-50 text-amber-800", "bg-white text-slate-400 border border-slate-200")}
-    ${btn("resumo", t("tipoResumo"), "bg-slate-200 text-slate-700", "bg-white text-slate-400 border border-slate-200")}</div>`;
+  return `<div class="flex gap-1">${btn("artigo-completo", t("tipoCompleto"), "bg-amber-50 text-amber-800", "bg-white text-slate-500 border border-slate-200")}
+    ${btn("resumo", t("tipoResumo"), "bg-slate-200 text-slate-700", "bg-white text-slate-500 border border-slate-200")}</div>`;
 }
 
 const TEMA_PILL = {
@@ -893,7 +1116,7 @@ function temaEditor(item, i) {
       const cls = active ? TEMA_PILL[tid] : "bg-white text-slate-300 border border-slate-200";
       const label = themeLabel(tid, jevOpenRun);
       return `<button type="button" data-jev-label="tema" data-jev-i="${i}" data-value="${esc(tid)}"
-        class="inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${cls}">${esc(label)}</button>`;
+        class="chip ${cls}">${esc(label)}</button>`;
     })
     .join("")}</div>`;
 }
@@ -908,7 +1131,7 @@ function themeScoresSidebar(item) {
     const p = Math.round(Number(raw) * 100);
     if (Number.isNaN(p)) continue;
     rows.push(`<div class="mb-1.5">
-      <div class="flex items-baseline justify-between gap-2 text-[10px] uppercase tracking-wide text-slate-400">
+      <div class="flex items-baseline justify-between gap-2 text-[10px] uppercase tracking-wide text-slate-500">
         <span>${esc(themeLabel(th.id, jevOpenRun))}</span>
         <span class="tabular-nums text-slate-600">${p}%</span>
       </div>
@@ -1009,7 +1232,7 @@ function jevRowHtml(item, i) {
   return `<tr data-jev-i="${i}" class="border-b border-slate-100 cursor-pointer hover:bg-slate-50 ${selected}">
     <td class="py-3 pr-4 pl-4">
       <div class="text-sm leading-snug">${titleHtml}</div>
-      <div class="text-xs text-slate-400 mt-0.5">${esc(item.source || "")}</div>
+      <div class="text-xs text-slate-500 mt-0.5">${esc(item.source || "")}</div>
     </td>
     <td class="py-3 px-2">${compactTemasCell(item)}</td>
     <td class="py-3 px-2 whitespace-nowrap">${tipoEditor(item, i)}</td>
@@ -1026,7 +1249,7 @@ function paintJevSortHeaders() {
     const label = th.dataset.jevLabel;
     th.textContent = label + mark;
     th.classList.toggle("text-slate-700", on);
-    th.classList.toggle("text-slate-400", !on);
+    th.classList.toggle("text-slate-500", !on);
   });
 }
 
@@ -1036,7 +1259,7 @@ function groupHeaderHtml(key, members) {
   return `<tr data-jev-group="${esc(key)}" class="cursor-pointer select-none bg-slate-100 hover:bg-slate-200/80 border-y-2 border-slate-200">
     <td colspan="6" class="px-4 py-5">
       <span class="inline-flex items-center gap-2 text-sm font-semibold tracking-wide text-slate-700">
-        <span class="w-4 text-slate-400">${chev}</span>
+        <span class="w-4 text-slate-500">${chev}</span>
         ${esc(groupDisplayLabel(key))}
         <span class="rounded-md bg-white px-2 py-0.5 text-xs font-medium text-slate-500">${members.length}</span>
       </span>
@@ -1188,33 +1411,33 @@ function renderJevRunDetail(run) {
     <div class="flex flex-col lg:flex-row gap-6 items-start">
       <div class="flex-1 min-w-0 bg-white rounded-xl border border-slate-200">
         <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 p-3 border-b border-slate-100">
-          <input id="jev-q" type="search" placeholder="${esc(t("searchPlaceholder"))}" class="col-span-2 rounded-md border border-slate-200 px-2 py-1.5 text-xs">
-          <select id="jev-source" class="rounded-md border border-slate-200 px-2 py-1.5 text-xs">${optionList(sources, t("allSources"))}</select>
-          <select id="jev-tipo" class="rounded-md border border-slate-200 px-2 py-1.5 text-xs">
+          <input id="jev-q" aria-label="${esc(t("searchPlaceholder"))}" type="search" placeholder="${esc(t("searchPlaceholder"))}" class="col-span-2 rounded-md border border-slate-200 px-2 py-1.5 text-xs">
+          <select id="jev-source" aria-label="${esc(t("allSources"))}" class="rounded-md border border-slate-200 px-2 py-1.5 text-xs">${optionList(sources, t("allSources"))}</select>
+          <select id="jev-tipo" aria-label="${esc(t("allTypes"))}" class="rounded-md border border-slate-200 px-2 py-1.5 text-xs">
             <option value="">${esc(t("allTypes"))}</option>
             <option value="artigo-completo">${esc(t("tipoCompleto"))}</option>
             <option value="resumo">${esc(t("tipoResumo"))}</option>
           </select>
-          <select id="jev-tema" class="rounded-md border border-slate-200 px-2 py-1.5 text-xs">${themeFilterOptions(temas, run)}</select>
-          <select id="jev-skip" class="rounded-md border border-slate-200 px-2 py-1.5 text-xs">
+          <select id="jev-tema" aria-label="${esc(t("allThemes"))}" class="rounded-md border border-slate-200 px-2 py-1.5 text-xs">${themeFilterOptions(temas, run)}</select>
+          <select id="jev-skip" aria-label="${esc(t("keptAndSkipped"))}" class="rounded-md border border-slate-200 px-2 py-1.5 text-xs">
             <option value="">${esc(t("keptAndSkipped"))}</option>
             <option value="kept">${esc(t("keptOnly"))}</option>
             <option value="skipped">${esc(t("skippedOnly"))}</option>
             <option value="error">${esc(t("errorsOnly"))}</option>
           </select>
-          <select id="jev-group" class="rounded-md border border-slate-200 px-2 py-1.5 text-xs">
+          <select id="jev-group" aria-label="${esc(t("groupNone"))}" class="rounded-md border border-slate-200 px-2 py-1.5 text-xs">
             <option value="none">${esc(t("groupNone"))}</option>
             <option value="source">${esc(t("groupSource"))}</option>
             <option value="tipo">${esc(t("groupType"))}</option>
             <option value="tema">${esc(t("groupTheme"))}</option>
             <option value="skip">${esc(t("groupSkip"))}</option>
           </select>
-          <p id="jev-filter-count" class="col-span-2 xl:col-span-6 self-end text-xs text-slate-400 m-0"></p>
+          <p id="jev-filter-count" class="col-span-2 xl:col-span-6 self-end text-xs text-slate-500 m-0"></p>
         </div>
         <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
-            <tr class="text-left text-xs font-medium text-slate-400 border-b border-slate-200">
+            <tr class="text-left text-xs font-medium text-slate-500 border-b border-slate-200">
               <th data-jev-sort="story" data-jev-label="${esc(t("story"))}" class="py-2.5 px-4 font-medium cursor-pointer select-none hover:text-slate-700">${esc(t("story"))}</th>
               <th data-jev-sort="temas" data-jev-label="${esc(t("themes"))}" class="py-2.5 px-2 font-medium cursor-pointer select-none hover:text-slate-700">${esc(t("themes"))}</th>
               <th data-jev-sort="tipo" data-jev-label="${esc(t("type"))}" class="py-2.5 px-2 font-medium cursor-pointer select-none hover:text-slate-700">${esc(t("type"))}</th>
@@ -1232,16 +1455,16 @@ function renderJevRunDetail(run) {
           <h2 class="text-sm font-semibold text-slate-800 m-0">${esc(t("run"))}</h2>
           <span class="text-xs text-emerald-700">${esc(statusLabel)}</span>
         </div>
-        <p class="text-[11px] text-slate-400 break-all mb-3">${esc(run.path || "")}</p>
+        <p class="text-[11px] text-slate-500 break-all mb-3">${esc(run.path || "")}</p>
         <div class="grid grid-cols-2 gap-y-2 text-sm mb-3">
-          <span class="text-slate-400">${esc(t("stories"))}</span><span class="text-right font-medium">${run.article_count}</span>
-          <span class="text-slate-400">${esc(t("skipped"))}</span><span class="text-right font-medium">${run.skipped}</span>
-          <span class="text-slate-400">${esc(t("workers"))}</span><span class="text-right font-medium">${run.workers ?? "—"}</span>
-          <span class="text-slate-400">${esc(t("minRelevance"))}</span><span class="text-right font-medium">${run.min_relevance ?? run.min_keep ?? 0}</span>
+          <span class="text-slate-500">${esc(t("stories"))}</span><span class="text-right font-medium">${run.article_count}</span>
+          <span class="text-slate-500">${esc(t("skipped"))}</span><span class="text-right font-medium">${run.skipped}</span>
+          <span class="text-slate-500">${esc(t("workers"))}</span><span class="text-right font-medium">${run.workers ?? "—"}</span>
+          <span class="text-slate-500">${esc(t("minRelevance"))}</span><span class="text-right font-medium">${run.min_relevance ?? run.min_keep ?? 0}</span>
         </div>
         <div class="grid grid-cols-2 gap-y-1 text-sm mb-4">
-          <span class="text-slate-400">${esc(t("tokensIn"))}</span><span class="text-right">${tokens.inn.toLocaleString()}</span>
-          <span class="text-slate-400">${esc(t("tokensOut"))}</span><span class="text-right">${tokens.out.toLocaleString()}</span>
+          <span class="text-slate-500">${esc(t("tokensIn"))}</span><span class="text-right">${tokens.inn.toLocaleString()}</span>
+          <span class="text-slate-500">${esc(t("tokensOut"))}</span><span class="text-right">${tokens.out.toLocaleString()}</span>
         </div>
         <pre id="jev-json" class="text-[11px] leading-snug text-slate-600 bg-slate-50 rounded-lg p-3 max-h-64 overflow-auto whitespace-pre-wrap m-0">${esc(t("clickRowJson"))}</pre>
         <div id="jev-extra-labels" class="mt-3 hidden"></div>
@@ -1343,7 +1566,7 @@ function extraScoreVizBar(pct, warn) {
 
 function extraScoreRow(i, key, label, pct, warn) {
   const p = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
-  return `<label class="mb-2 flex flex-col gap-0.5 text-[10px] uppercase tracking-wide text-slate-400">${esc(label)}
+  return `<label class="mb-2 flex flex-col gap-0.5 text-[10px] uppercase tracking-wide text-slate-500">${esc(label)}
     <span class="flex items-center gap-2">
       <input type="number" min="0" max="100" step="1" value="${p}"
         data-jev-label="${esc(key)}" data-jev-i="${i}"
@@ -1430,5 +1653,8 @@ if (tokenInput) {
     const v = tokenInput.value.trim();
     if (v) localStorage.setItem(TOKEN_KEY, v);
     else localStorage.removeItem(TOKEN_KEY);
+    paintTokenSummary();
   });
 }
+paintTokenSummary();
+if (!dashboardToken()) $("#token-menu")?.setAttribute("open", "");
