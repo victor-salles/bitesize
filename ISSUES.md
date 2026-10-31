@@ -11,7 +11,7 @@ Vercel AI Gateway's free tier only serves a subset of models and rate-limits the
 
 **Landed:** 429/5xx calls retry with backoff. After a 401/403/404 the run stops sending requests and marks the rest "not sent". The Jev tab marks failed runs in red and shows one banner with the cause.
 
-**Still open:** access. Either buy AI Gateway Credits or put a working TypeSafe key in `TYPESAFE_API_KEY`.
+**Access restored (31 Oct 2026):** `TYPESAFE_API_KEY` is now a TypeSafe console key, so calls go to `api.typesafe.ai` instead of the gateway. A 20-story test batch scored with `jev-1.14.0` and no errors. Close this once a morning run confirms it.
 
 ## Antigravity flakes during the daily run
 
