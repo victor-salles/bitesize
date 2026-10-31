@@ -15,6 +15,7 @@ from tags import normalize_tags
 
 MAX_WORKERS = 32
 GATEWAY_BASE_URL = "https://ai-gateway.vercel.sh"
+GATEWAY_EVALUATE_PATH = "/v1/evaluate"
 
 
 def _api_key() -> str:
@@ -34,6 +35,93 @@ def client_kwargs() -> dict[str, str]:
     if base:
         kwargs["base_url"] = base.rstrip("/")
     return kwargs
+
+
+def uses_gateway() -> bool:
+    return "ai-gateway.vercel.sh" in client_kwargs().get("base_url", "")
+
+
+def gateway_model() -> str:
+    model = os.environ.get("TYPESAFE_DEFAULT_MODEL", "").strip() or "typesafe-ai/jev"
+    if "/" not in model:
+        model = f"typesafe-ai/{model}"
+    return model
+
+
+def evaluate_questions(questions: dict[str, Any]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for name, question in questions.items():
+        if hasattr(question, "model_dump"):
+            raw = question.model_dump(exclude_none=True)
+        elif isinstance(question, dict):
+            raw = {k: v for k, v in question.items() if v is not None}
+        else:
+            raw = {
+                "type": getattr(question, "type", None),
+                "instructions": getattr(question, "instructions", None),
+                "criteria": getattr(question, "criteria", None),
+            }
+            raw = {k: v for k, v in raw.items() if v is not None}
+        if raw.get("type") == "noul":
+            raw["type"] = "boolean"
+        out[name] = raw
+    return out
+
+
+def response_from_evaluate(payload: dict[str, Any]) -> Any:
+    from types import SimpleNamespace
+
+    nouls: dict[str, Any] = {}
+    choices: dict[str, Any] = {}
+    for name, answer in (payload.get("answers") or {}).items():
+        kind = (answer or {}).get("type")
+        if kind == "boolean":
+            nouls[name] = SimpleNamespace(noul=float(answer.get("probability") or 0))
+        elif kind == "choice":
+            choices[name] = SimpleNamespace(
+                choice=answer.get("choice"),
+                probabilities=answer.get("probabilities"),
+            )
+    usage_raw = payload.get("usage") or {}
+    usage = SimpleNamespace(
+        input_tokens=usage_raw.get("input_tokens", usage_raw.get("inputTokens")),
+        output_tokens=usage_raw.get("output_tokens", usage_raw.get("outputTokens")),
+    )
+    return SimpleNamespace(
+        nouls=nouls,
+        choices=choices,
+        scores={},
+        model=payload.get("model"),
+        usage=usage,
+    )
+
+
+def gateway_post(url: str, *, json: dict[str, Any], headers: dict[str, str]) -> dict[str, Any]:
+    import httpx2
+
+    response = httpx2.post(url, json=json, headers=headers, timeout=60.0)
+    if response.status_code >= 400:
+        snippet = (response.text or "").strip()[:300]
+        raise RuntimeError(f"POST {url}: {response.status_code} {snippet}")
+    return response.json()
+
+
+def call_evaluate(state: Any, questions: dict[str, Any]) -> Any:
+    kw = client_kwargs()
+    url = kw["base_url"] + GATEWAY_EVALUATE_PATH
+    payload = gateway_post(
+        url,
+        json={
+            "model": gateway_model(),
+            "state": state,
+            "questions": evaluate_questions(questions),
+        },
+        headers={
+            "Authorization": f"Bearer {kw['api_key']}",
+            "Content-Type": "application/json",
+        },
+    )
+    return response_from_evaluate(payload)
 
 
 def available() -> bool:
@@ -109,10 +197,13 @@ def classify_article(
     questions = news_questions()
     try:
         if system_one is None:
-            from typesafe_sdk import TypeSafeClient
+            if uses_gateway():
+                response = call_evaluate(state, questions)
+            else:
+                from typesafe_sdk import TypeSafeClient
 
-            with TypeSafeClient(**client_kwargs()) as client:
-                response = client.system_one(state=state, questions=questions)
+                with TypeSafeClient(**client_kwargs()) as client:
+                    response = client.system_one(state=state, questions=questions)
         else:
             response = system_one(state=state, questions=questions)
         answers = flatten_response(response)
