@@ -309,11 +309,42 @@ function paintLangSwitcher() {
   });
 }
 
+const THEME_KEY = "bitesize_theme";
+
+function themeChoice() {
+  try {
+    const v = localStorage.getItem(THEME_KEY);
+    return v === "light" || v === "dark" ? v : "auto";
+  } catch {
+    return "auto";
+  }
+}
+
+function setThemeChoice(choice) {
+  try {
+    if (choice === "auto") localStorage.removeItem(THEME_KEY);
+    else localStorage.setItem(THEME_KEY, choice);
+  } catch {}
+  if (choice === "auto") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = choice;
+  paintThemeSwitcher();
+}
+
+function paintThemeSwitcher() {
+  const current = themeChoice();
+  $$("#theme-switch [data-theme-choice]").forEach((btn) => {
+    btn.setAttribute("aria-pressed", String(btn.dataset.themeChoice === current));
+    btn.title = t(`theme_${btn.dataset.themeChoice}`);
+    btn.setAttribute("aria-label", btn.title);
+  });
+}
+
 function setUiLang(lang, { persist = false } = {}) {
   uiLangCode = lang === "pt" ? "pt" : "en";
   if (persist) localStorage.setItem(LANG_KEY, uiLangCode);
   applyStaticI18n();
   paintLangSwitcher();
+  paintThemeSwitcher();
   if (Object.keys(settingsData).length) {
     renderSettingsGroups();
     renderKindleFields();
@@ -1637,6 +1668,10 @@ $("#export-jev-labels").onclick = async () => {
 $$("#ui-lang-switch [data-ui-lang]").forEach((btn) => {
   btn.addEventListener("click", () => setUiLang(btn.dataset.uiLang, { persist: true }));
 });
+$$("#theme-switch [data-theme-choice]").forEach((btn) => {
+  btn.addEventListener("click", () => setThemeChoice(btn.dataset.themeChoice));
+});
+paintThemeSwitcher();
 
 loadSettings().then(refreshSources).catch((e) => {
   setStatus($("#settings-status"), e.message, false);

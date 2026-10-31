@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BiteSIze Settings</title>
   <script>
+    // Before first paint, so a pinned theme never flashes the other one.
+    try {
+      const theme = localStorage.getItem("bitesize_theme");
+      if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+    } catch {}
+  </script>
+  <script>
     tailwind.config = { corePlugins: { preflight: false } };
   </script>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -17,6 +24,11 @@
       <div id="ui-lang-switch" class="lang-switch" role="group" aria-label="UI language">
         <button type="button" data-ui-lang="en" class="ui-lang-btn">En</button>
         <button type="button" data-ui-lang="pt" class="ui-lang-btn">Pt</button>
+      </div>
+      <div id="theme-switch" class="lang-switch theme-switch" role="group" aria-label="Theme">
+        <button type="button" data-theme-choice="auto" class="ui-lang-btn">Auto</button>
+        <button type="button" data-theme-choice="light" class="ui-lang-btn">☀︎</button>
+        <button type="button" data-theme-choice="dark" class="ui-lang-btn">☾</button>
       </div>
       <details class="token-menu" id="token-menu">
         <summary id="token-summary">Write token</summary>
