@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import os
 import secrets
+from datetime import datetime, timezone
 from pathlib import Path
 
 from flask import Flask, jsonify, request, send_from_directory
 
 import settings_store as store
-from config import BASE_DIR, load_env, reload_settings
+from config import BASE_DIR, OUTPUT_DIR, load_env, reload_settings
 import jev_labels
 import jev_log
 from themes import list_themes, replace_themes
@@ -71,9 +72,20 @@ def health():
     return jsonify({"ok": True})
 
 
+def _last_digest() -> dict | None:
+    epubs = sorted(OUTPUT_DIR.glob("*.epub"), key=lambda p: p.stat().st_mtime) if OUTPUT_DIR.is_dir() else []
+    if not epubs:
+        return None
+    newest = epubs[-1]
+    finished = datetime.fromtimestamp(newest.stat().st_mtime, tz=timezone.utc)
+    return {"file": newest.name, "finished_at": finished.isoformat()}
+
+
 @app.get("/api/digest/run")
 def digest_status():
-    return jsonify(runner.snapshot())
+    body = runner.snapshot()
+    body["last_digest"] = _last_digest()
+    return jsonify(body)
 
 
 @app.post("/api/digest/run")

@@ -346,6 +346,30 @@ def test_digest_status_idle(client, monkeypatch):
     ]
 
 
+def test_digest_status_reports_newest_epub(client, tmp_path, monkeypatch):
+    import os
+
+    out = tmp_path / "output"
+    out.mkdir()
+    old = out / "News Digest - October 29 2026 0650.epub"
+    new = out / "News Digest - October 30 2026 0651.epub"
+    old.write_bytes(b"x")
+    new.write_bytes(b"x")
+    os.utime(old, (1_000, 1_000))
+    os.utime(new, (2_000, 2_000))
+    (out / "notes.txt").write_text("not an epub")
+    monkeypatch.setattr(dashboard, "OUTPUT_DIR", out)
+
+    body = client.get("/api/digest/run").get_json()
+    assert body["last_digest"]["file"] == new.name
+    assert body["last_digest"]["finished_at"].startswith("1970-01-01T00:33:20")
+
+
+def test_digest_status_without_epub_has_no_last_digest(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(dashboard, "OUTPUT_DIR", tmp_path / "missing")
+    assert client.get("/api/digest/run").get_json()["last_digest"] is None
+
+
 def test_digest_start_requires_token(client):
     r = client.post("/api/digest/run")
     assert r.status_code == 401
