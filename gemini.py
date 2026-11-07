@@ -5,6 +5,7 @@ from typing import Optional
 from ai_locale import ai_output_language_rule
 from config import console, get_settings
 from ai import call as _call_ai, available as _ai_available
+import jev_triage
 from tags import TEMAS, normalize_tags
 
 CLUSTERED_AI_SCORE_RATIO = 0.35
@@ -224,11 +225,88 @@ def process_articles(articles: list[dict], batch_size: int | None = None) -> lis
       • Writes a 2-sentence factual summary   (summary="…")
       • Assigns relevance (0–100) for ranking the digest
 
+    When Jev triage is on, skip/relevance/tags come from Jev first; the writing
+    model only fills summaries.
+
     Falls back gracefully: if Gemini is unavailable or a batch fails,
     the original articles are kept without summaries.
     """
     if batch_size is None:
         batch_size = get_settings().gemini_batch_size
+    if jev_triage.available():
+        try:
+            return _process_articles_jev(articles, batch_size)
+        except Exception as exc:
+            console.print(f"  [yellow]⚠  Jev triage failed ({exc}) — using writing model[/yellow]")
+    elif get_settings().jev_triage_enabled:
+        console.print(
+            "  [yellow]⚠  Jev is on, but no TypeSafe or Vercel AI Gateway key is loaded — skipping scoring[/yellow]"
+        )
+    return _process_articles_llm(articles, batch_size)
+
+
+def _process_articles_jev(articles: list[dict], batch_size: int) -> list[dict]:
+    """Jev decides skip/relevance/tags; the writing model still writes summaries."""
+    console.print("  Jev triage (ads, relevance, temas)…")
+    classified = jev_triage.classify_articles(articles)
+    kept: list[dict] = []
+    for art in classified:
+        if art.get("skip"):
+            reason = art.get("skip_reason") or "jev"
+            console.print(
+                f"  [dim]✗  filtered ({reason}):[/dim] \"{art['title']}\" "
+                f"[dim]({art.get('source', '')})[/dim]"
+            )
+            continue
+        if "relevance" not in art:
+            _assign_fallback_relevance(art)
+            normalize_tags(art)
+        kept.append(art)
+    kept = _fill_summaries(kept, batch_size)
+    return spread_tied_scores(kept)
+
+
+def _fill_summaries(articles: list[dict], batch_size: int) -> list[dict]:
+    if not articles:
+        return articles
+    if not _ai_available():
+        console.print("  [yellow]⚠  Writing model unavailable — keeping Jev scores, no summaries[/yellow]")
+        return articles
+
+    processed: list[dict] = []
+    for i in range(0, len(articles), batch_size):
+        batch = articles[i : i + batch_size]
+        article_block = ""
+        for j, art in enumerate(batch):
+            preview = (
+                _truncate_text(art["content"]) if art.get("content") else art["title"]
+            )
+            article_block += f'[{j}] "{art["title"]}"\n{preview}\n\n'
+        instruction = (
+            f"You are a news editor. Write a 2-sentence factual summary for each of "
+            f"{len(batch)} articles. Return ONLY a raw JSON array — no markdown fences: "
+            '[{"id":0,"summary":"Sentence one. Sentence two."}] '
+            "Rules: exactly 2 factual sentences, no editorialising, no filler phrases."
+            + ai_output_language_rule()
+        )
+        response = _call_ai(instruction, article_block)
+        by_id: dict[int, str] = {}
+        if response:
+            parsed = _extract_json(response)
+            if isinstance(parsed, list):
+                for item in parsed:
+                    idx = item.get("id", -1)
+                    if 0 <= idx < len(batch) and item.get("summary"):
+                        by_id[idx] = item["summary"]
+        for j, art in enumerate(batch):
+            a = art.copy()
+            if j in by_id:
+                a["summary"] = by_id[j]
+            processed.append(a)
+    return processed
+
+
+def _process_articles_llm(articles: list[dict], batch_size: int) -> list[dict]:
     if not _ai_available():
         console.print("  [yellow]⚠  AI backend not available — skipping AI processing[/yellow]")
         out = []

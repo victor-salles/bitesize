@@ -7,7 +7,8 @@
     "bitesize": "./bitesize.js"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "css:dashboard": "sass dashboard_static/style.scss dashboard_static/style.css --no-source-map"
   },
   "keywords": [],
   "author": "",

@@ -4,43 +4,83 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BiteSIze Settings</title>
-  <link rel="stylesheet" href="/style.css">
+  <script>
+    // Before first paint, so a pinned theme never flashes the other one.
+    try {
+      const theme = localStorage.getItem("bitesize_theme");
+      if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+    } catch {}
+  </script>
+  <script>
+    tailwind.config = { corePlugins: { preflight: false } };
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/style.css?v=ui9">
 </head>
 <body>
   <header>
-    <h1>BiteSIze</h1>
+    <div class="header-top">
+      <h1>BiteSIze</h1>
+      <div id="ui-lang-switch" class="lang-switch" role="group" aria-label="UI language">
+        <button type="button" data-ui-lang="en" class="ui-lang-btn">En</button>
+        <button type="button" data-ui-lang="pt" class="ui-lang-btn">Pt</button>
+      </div>
+      <div id="theme-switch" class="lang-switch theme-switch" role="group" aria-label="Theme">
+        <button type="button" data-theme-choice="auto" class="ui-lang-btn">Auto</button>
+        <button type="button" data-theme-choice="light" class="ui-lang-btn">☀︎</button>
+        <button type="button" data-theme-choice="dark" class="ui-lang-btn">☾</button>
+      </div>
+      <details class="token-menu" id="token-menu">
+        <summary id="token-summary">Write token</summary>
+        <div class="token-menu__pop">
+          <label for="dashboard-token">Write API token</label>
+          <input id="dashboard-token" type="password" placeholder="Bearer token (if configured)">
+          <p id="token-help" class="token-menu__help">From data/dashboard.token. Needed to save or run.</p>
+        </div>
+      </details>
+    </div>
     <p class="subtitle">Settings dashboard — changes apply to the CLI immediately</p>
-    <div class="field token-field">
-      <label for="dashboard-token">Write API token</label>
-      <input id="dashboard-token" type="password" placeholder="Bearer token (if configured)">
+
+    <div class="run-bar">
+      <div class="run-bar__text">
+        <p id="last-digest" class="run-bar__last"></p>
+        <p id="digest-run-status" class="status" role="status"></p>
+      </div>
+      <button type="button" id="run-digest" class="primary">Run digest</button>
+    </div>
+
+    <div id="digest-progress" class="card digest-progress" hidden>
+      <ol id="digest-steps" class="digest-steps"></ol>
+      <pre id="digest-log" class="digest-log" hidden></pre>
     </div>
   </header>
 
-  <nav class="tabs">
-    <button class="tab active" data-tab="settings">Settings</button>
-    <button class="tab" data-tab="sources">Sources</button>
-    <button class="tab" data-tab="preview">Preview</button>
-    <button class="tab" data-tab="kindle">Kindle</button>
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button class="tab active" role="tab" id="tab-settings" aria-controls="panel-settings" aria-selected="true" data-tab="settings">Settings</button>
+    <button class="tab" role="tab" id="tab-sources" aria-controls="panel-sources" aria-selected="false" tabindex="-1" data-tab="sources">Sources</button>
+    <button class="tab" role="tab" id="tab-preview" aria-controls="panel-preview" aria-selected="false" tabindex="-1" data-tab="preview">Preview</button>
+    <button class="tab" role="tab" id="tab-jev" aria-controls="panel-jev" aria-selected="false" tabindex="-1" data-tab="jev">Jev</button>
+    <button class="tab" role="tab" id="tab-kindle" aria-controls="panel-kindle" aria-selected="false" tabindex="-1" data-tab="kindle">Kindle</button>
   </nav>
 
   <main>
-    <section id="panel-settings" class="panel active">
+    <section id="panel-settings" class="panel active" role="tabpanel" aria-labelledby="tab-settings">
       <div id="settings-groups"></div>
       <button id="save-settings" class="primary">Save settings</button>
       <p id="settings-status" class="status"></p>
     </section>
 
-    <section id="panel-sources" class="panel">
+    <section id="panel-sources" class="panel" role="tabpanel" aria-labelledby="tab-sources">
       <div class="toolbar">
-        <input id="new-category-name" type="text" placeholder="New category name">
+        <input id="new-category-name" type="text" placeholder="New category name" aria-label="New category name">
         <button id="add-category">Add category</button>
       </div>
       <div id="sources-list"></div>
       <p id="sources-status" class="status"></p>
     </section>
 
-    <section id="panel-preview" class="panel">
-      <p class="preview-intro">Latest headlines from each source. Turn a source off if the mix is not worth keeping.</p>
+    <section id="panel-preview" class="panel" role="tabpanel" aria-labelledby="tab-preview">
+      <p class="preview-intro">Five headlines per source at first. Show more when a feed has extra items, then decide whether to include it.</p>
       <div class="toolbar">
         <button id="refresh-preview" class="primary">Load headlines</button>
       </div>
@@ -48,7 +88,19 @@
       <div id="preview-list"></div>
     </section>
 
-    <section id="panel-kindle" class="panel">
+    <section id="panel-jev" class="panel" role="tabpanel" aria-labelledby="tab-jev">
+      <p class="preview-intro">Each digest that runs Jev writes a JSON file under <code>output/jev/</code>. Open a run to see every score Jev returned.</p>
+      <div class="toolbar gap-3">
+        <button id="refresh-jev" class="primary">Reload runs</button>
+        <button id="export-jev-labels">Export labels</button>
+      </div>
+      <p id="jev-status" class="status"></p>
+      <div id="jev-theme-editor" class="card mb-4"></div>
+      <div id="jev-run-list"></div>
+      <div id="jev-run-detail"></div>
+    </section>
+
+    <section id="panel-kindle" class="panel" role="tabpanel" aria-labelledby="tab-kindle">
       <div id="kindle-fields" class="card"></div>
       <div class="actions">
         <button id="save-kindle" class="primary">Save Kindle settings</button>
@@ -59,9 +111,10 @@
   </main>
 
   <footer>
-    <p>Backlog: AI summary preview, magazine covers</p>
+    <p>Jev runs are on the Jev tab. Still open: last-digest preview and magazine covers.</p>
   </footer>
 
-  <script src="/app.js"></script>
+  <script src="/i18n.js?v=ui9"></script>
+  <script src="/app.js?v=ui9"></script>
 </body>
 </html>

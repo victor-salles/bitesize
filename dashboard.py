@@ -4,14 +4,20 @@ from __future__ import annotations
 
 import os
 import secrets
+from datetime import datetime, timezone
 from pathlib import Path
 
 from flask import Flask, jsonify, request, send_from_directory
 
 import settings_store as store
-from config import BASE_DIR, load_env, reload_settings
+from config import BASE_DIR, OUTPUT_DIR, load_env, reload_settings
+import jev_labels
+import jev_log
+from themes import list_themes, replace_themes
 from kindle import send_test_email
-from preview import build_source_preview
+from preview import PREVIEW_FETCH_LIMIT, build_source_preview
+import digest_run
+from digest_run import BusyError
 
 load_env()
 
@@ -35,6 +41,7 @@ def _resolve_dashboard_token() -> str:
 
 
 DASHBOARD_TOKEN = _resolve_dashboard_token()
+runner = digest_run.runner
 
 app = Flask(__name__, static_folder=str(STATIC_DIR), static_url_path="")
 
@@ -65,6 +72,32 @@ def health():
     return jsonify({"ok": True})
 
 
+def _last_digest() -> dict | None:
+    epubs = sorted(OUTPUT_DIR.glob("*.epub"), key=lambda p: p.stat().st_mtime) if OUTPUT_DIR.is_dir() else []
+    if not epubs:
+        return None
+    newest = epubs[-1]
+    finished = datetime.fromtimestamp(newest.stat().st_mtime, tz=timezone.utc)
+    return {"file": newest.name, "finished_at": finished.isoformat()}
+
+
+@app.get("/api/digest/run")
+def digest_status():
+    body = runner.snapshot()
+    body["last_digest"] = _last_digest()
+    return jsonify(body)
+
+
+@app.post("/api/digest/run")
+def digest_start():
+    try:
+        return jsonify(runner.start()), 202
+    except BusyError as exc:
+        body = runner.snapshot()
+        body["error"] = str(exc)
+        return jsonify(body), 409
+
+
 @app.get("/api/settings")
 def get_settings_api():
     return jsonify(store.settings_for_api())
@@ -90,8 +123,8 @@ def get_sources_api():
 
 @app.get("/api/preview")
 def get_preview_api():
-    max_headlines = request.args.get("max", default=5, type=int)
-    max_headlines = max(1, min(int(max_headlines or 5), 12))
+    max_headlines = request.args.get("max", default=PREVIEW_FETCH_LIMIT, type=int)
+    max_headlines = max(1, min(int(max_headlines or PREVIEW_FETCH_LIMIT), PREVIEW_FETCH_LIMIT))
     return jsonify(
         build_source_preview(
             store.load_sources_for_api(),
@@ -161,6 +194,78 @@ def put_feed(feed_id: int):
 def delete_feed(feed_id: int):
     store.delete_feed(feed_id)
     return jsonify({"ok": True})
+
+
+@app.get("/api/jev/themes")
+def get_jev_themes():
+    return jsonify({"themes": list_themes()})
+
+
+@app.put("/api/jev/themes")
+def put_jev_themes():
+    data = request.get_json(silent=True)
+    if not isinstance(data, list):
+        return jsonify({"error": "Expected JSON array"}), 400
+    if not data:
+        return jsonify({"error": "themes array must not be empty"}), 400
+    try:
+        themes = replace_themes(data)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify({"themes": themes})
+
+
+@app.get("/api/jev/runs")
+def list_jev_runs():
+    return jsonify({"runs": jev_log.list_runs()})
+
+
+@app.get("/api/jev/runs/<run_id>")
+def get_jev_run(run_id: str):
+    payload = jev_labels.attach_labels(jev_log.load_run(run_id))
+    if payload is None:
+        return jsonify({"error": "Run not found"}), 404
+    payload["themes"] = list_themes()
+    return jsonify(payload)
+
+
+@app.post("/api/jev/labels")
+def save_jev_label():
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return jsonify({"error": "Expected JSON object"}), 400
+    run_id = str(data.get("run_id") or "")
+    payload = jev_log.load_run(run_id)
+    if payload is None:
+        return jsonify({"error": "Run not found"}), 404
+    items = payload.get("items") or []
+    try:
+        index = int(data.get("index"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "index required"}), 400
+    if index < 0 or index >= len(items):
+        return jsonify({"error": "index out of range"}), 400
+    item = items[index]
+    patch = {
+        k: data[k]
+        for k in (
+            "ad",
+            "clickbait",
+            "press_release",
+            "paywall_teaser",
+            "relevance",
+            "tipo",
+            "temas",
+        )
+        if k in data
+    }
+    human = jev_labels.save_label(run_id, item, patch)
+    return jsonify({"ok": True, "human": human, "index": index})
+
+
+@app.get("/api/jev/labels/export")
+def export_jev_labels():
+    return jsonify({"rows": jev_labels.export_rows()})
 
 
 @app.post("/api/kindle/test")
