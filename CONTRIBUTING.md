@@ -23,6 +23,12 @@ Add or update tests when changing behavior. CI runs the suite plus coverage, `pi
 - Keep changes focused and include tests for behavior changes.
 - Do not commit secrets: `.env`, `data/`, `token.json`, or `credentials.json`.
 - Run the full test suite before opening a PR.
+- Commit messages and PR titles use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/): `<type>(<optional scope>): <description>`, lowercase, imperative, no trailing period. Mark breaking changes with `!` and a `BREAKING CHANGE:` footer.
+- Fill in the PR template's **Release impact** boxes; they decide the next version.
+
+## Releases
+
+Releases are [SemVer](https://semver.org/) tags (`vMAJOR.MINOR.PATCH`) on `main`, each with a GitHub Release holding its notes. A breaking change bumps MAJOR (MINOR before `v1.0.0`), a new feature bumps MINOR, anything else bumps PATCH.
 
 ## Security
 
