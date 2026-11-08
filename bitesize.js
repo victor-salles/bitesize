@@ -2,7 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
-const chalk = require('chalk');
+const chalk = require('chalk').default;
 const { program } = require('commander');
 const { convert } = require('html-to-text');
 
