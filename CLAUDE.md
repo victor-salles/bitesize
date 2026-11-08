@@ -52,10 +52,30 @@ AI calls go through `ai.py` (`antigravity` / `gemini` / `ollama`). Prompts live 
 - **Tests first** for behavior changes. `pytest tests/ -v` is the gate.
 - **Delivery is best-effort.** Kindle/Books failures must not abort EPUB write.
 - **Stock Kindle has no JavaScript.** Internal links, covers, and reflowable HTML only. See `docs/research/2026-08-14-kindle-interactive-epub.md` before promising interactivity.
-- **Tags / completeness / Safari Reader** — planned, not built. See [ROADMAP.md](ROADMAP.md) items 1–2 and `docs/research/2026-08-30-safari-reader-paywall.md`. Do not invent English topic labels; the vocabulary is pt-BR.
+- **Tags / completeness / Safari Reader** — tags (`resumo` / `artigo-completo` + pt-BR temas) are in the digest. Safari Reader extract was measured and dropped. See [ROADMAP.md](ROADMAP.md) item 2.
 - **`wordflow/`** is a separate experimental Next.js app. Do not treat it as part of the digest unless the task names it.
 - **Published default is `main`.** Remote: `https://github.com/victor-salles/bitesize`. Do not commit `.env`, `data/`, or `output/`.
 - **Commits, branches and releases** follow `~/.claude/rules/git-conventions.md`: Conventional Commits, `main` as the only long-lived branch, SemVer tags with GitHub Releases (no CHANGELOG file). Use `/personal-commits`, `/personal-pr` and `/personal-release`. Before `v1.0.0` (the "Ready" bar in CONTEXT.md), breaking changes bump MINOR.
+
+## Agent skills
+
+### Issue tracker
+
+Linear (workspace Victor Salles). See `docs/agents/issue-tracker.md`.
+
+Victor’s comments and description edits on Linear are his response. When you need them, run `python scripts/linear-review-inbox.py` if OAuth client credentials are in `.env` — not at session start. Otherwise use Linear MCP. See `.cursor/skills/linear-review-inbox/SKILL.md`.
+
+### Triage labels
+
+Default roles: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` at the repo root. See `docs/agents/domain.md`.
+
+### Jev + dashboard pattern
+
+Reuse Jev scoring or the Jev review table (including an email client): `docs/agents/jev-ui-handoff.md`.
 
 ## Put down
 

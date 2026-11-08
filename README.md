@@ -63,7 +63,7 @@ Output lands in `./output/`. With `ai_language=pt-BR` the file is named like `Re
 
 ### AI backend
 
-The database default is **Antigravity** (`agy`) with `gemini-3.8-flash-high`, summaries in **pt-BR**. Switch backend and model in Settings.
+The database default is **Antigravity** (`agy`) with `gemini-3.8-flash-high`, summaries in **pt-BR**. Switch backend and model in Settings. Retired `gemini-3.5-flash-*` ids are mapped to 3.8 Flash.
 
 | Backend | What you install |
 | --- | --- |

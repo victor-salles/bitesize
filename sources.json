@@ -20,7 +20,9 @@
       "Al Jazeera":  "https://www.aljazeera.com/xml/rss/all.xml",
       "AP News":     "https://apnews.com/hub/apf-topnews?format=rss",
       "NPR News":    "https://feeds.npr.org/1001/rss.xml",
-      "Vox":         "https://www.vox.com/rss/index.xml"
+      "Vox":           "https://www.vox.com/rss/index.xml",
+      "Axios":         "https://api.axios.com/feed/",
+      "The New Things": "https://rss.beehiiv.com/feeds/1vJYynypCP.xml"
     }
   },
   "integrations": {

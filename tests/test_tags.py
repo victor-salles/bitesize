@@ -1,4 +1,7 @@
+import sqlite3
 from unittest.mock import patch
+
+import pytest
 
 import gemini
 from ai_locale import epub_label, format_tag_line
@@ -119,6 +122,29 @@ def test_tipos_and_temas_vocabularies():
     assert TIPOS == {"resumo", "artigo-completo"}
     assert "política" in TEMAS
     assert "sports" not in TEMAS
+
+
+def test_enabled_tema_ids_falls_back_on_sqlite_error(monkeypatch):
+    from themes import DEFAULT_THEMES
+
+    def boom():
+        raise sqlite3.OperationalError("disk I/O error")
+
+    monkeypatch.setattr("themes.list_themes", boom)
+    from tags import _enabled_tema_ids
+
+    assert _enabled_tema_ids() == frozenset(t["id"] for t in DEFAULT_THEMES)
+
+
+def test_enabled_tema_ids_propagates_non_operational_errors(monkeypatch):
+    def boom():
+        raise ValueError("bad theme row")
+
+    monkeypatch.setattr("themes.list_themes", boom)
+    from tags import _enabled_tema_ids
+
+    with pytest.raises(ValueError, match="bad theme row"):
+        _enabled_tema_ids()
 
 
 def test_process_articles_stores_tags_from_ai_batch(monkeypatch):

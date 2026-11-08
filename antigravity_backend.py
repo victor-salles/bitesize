@@ -12,6 +12,20 @@ _AGY_OK: Optional[bool] = None
 # Shortcuts and LaunchAgents often omit ~/.local/bin from PATH.
 _AGY_BIN = str(Path.home() / ".local" / "bin" / "agy")
 
+# agy retired Gemini 3.5 Flash ids; current list is 3.6–3.8 Flash (+ 3.1 Pro).
+_RETIRED_FLASH = (
+    "gemini-3.5-flash-high",
+    "gemini-3.5-flash-medium",
+    "gemini-3.5-flash-low",
+)
+
+
+def resolve_model(name: str) -> str:
+    model = (name or "").strip() or "gemini-3.8-flash-high"
+    if model in _RETIRED_FLASH:
+        return model.replace("gemini-3.5-flash-", "gemini-3.8-flash-", 1)
+    return model
+
 
 def available() -> bool:
     """Return True if the agy CLI is reachable."""
@@ -33,7 +47,7 @@ def call(instruction: str, stdin_data: str, label: str = "") -> Optional[str]:
     """Run Antigravity CLI in print mode and return the response string."""
     tag = f"[{label}] " if label else ""
     settings = get_settings()
-    model = (settings.antigravity_model or "gemini-3.5-flash-high").strip()
+    model = resolve_model(settings.antigravity_model)
     timeout = settings.gemini_timeout
     prompt = f"{instruction}\n\n{stdin_data}" if stdin_data else instruction
 

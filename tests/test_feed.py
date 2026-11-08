@@ -25,14 +25,31 @@ def test_fetch_feed_returns_empty_when_download_fails(monkeypatch):
     assert articles == []
 
 
-@patch("feed.requests.get")
-def test_download_url_uses_certifi(mock_get):
-    mock_get.return_value = MagicMock(
+def test_fetch_feed_fail_soft_false_raises_when_download_fails(monkeypatch):
+    monkeypatch.setattr(feed, "_download_url", lambda url: None)
+    try:
+        feed.fetch_feed(
+            "Test Source",
+            "https://example.com/feed.xml",
+            fail_soft=False,
+        )
+    except RuntimeError as exc:
+        assert "https://example.com/feed.xml" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError")
+
+
+@patch("feed.requests.Session")
+def test_download_url_uses_certifi(mock_session_cls):
+    session = MagicMock()
+    session.get.return_value = MagicMock(
         content=b"ok",
         raise_for_status=MagicMock(),
     )
+    mock_session_cls.return_value = session
     result = feed._download_url("https://example.com/rss")
     assert result == b"ok"
-    mock_get.assert_called_once()
-    _, kwargs = mock_get.call_args
+    session.get.assert_called_once()
+    _, kwargs = session.get.call_args
     assert kwargs["verify"] is not None
+    assert session.trust_env is False
