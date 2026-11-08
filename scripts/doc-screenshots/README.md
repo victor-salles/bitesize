@@ -18,10 +18,14 @@ DASHBOARD_TOKEN=demo .venv/bin/python dashboard.py &
 # 3. Capture (uses the installed Google Chrome)
 npm i --no-save playwright-core
 node scripts/doc-screenshots/capture.js /tmp/shots/book
+
+# 4. README carousels (animated WebP; GitHub strips JavaScript)
+.venv/bin/python scripts/doc-screenshots/carousel.py
 ```
 
 The PNGs land in `docs/screenshots/`. Check them before committing, then stop the dashboard.
 
 - **Change what gets shot:** edit `screens.js`.
+- **Change a carousel's pages or timing:** edit `carousel.py`.
 - **Change the demo stories:** edit `demo_digest.py`.
 - **Sizes:** the dashboard is shot at 1440×900, and book pages at Kindle Paperwhite proportions (618×824 CSS px). All shots are at 2× scale.
