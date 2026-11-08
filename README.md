@@ -20,6 +20,18 @@
 
 BiteSIze runs on one machine. It fetches the feeds you pick, pulls full article text, filters and summarizes with AI, and writes a magazine-style EPUB into `output/`. Kindle email and iCloud Books are extra steps: they fire when they are configured, and they are skipped when they are not.
 
+<p align="center">
+  <img src="docs/screenshots/carousel-book.webp" width="360" alt="A demo edition on a Kindle-sized screen, cycling through the library cover, edition cover, section cover, section index and an article page">
+  <br><sub>A demo edition with made-up stories: library cover, edition cover, section cover, section index, article.</sub>
+</p>
+
+<details>
+<summary>All ebook pages</summary>
+
+![Library cover, edition cover, section cover, section index and article, side by side](docs/screenshots/book-tour.png)
+
+</details>
+
 > [!NOTE]
 > This is a **single-user local tool**. The dashboard binds to `127.0.0.1` and is not meant to be exposed. Secrets stay in `.env` and `data/` — never in git.
 
@@ -47,6 +59,21 @@ python dashboard.py          # http://127.0.0.1:8765
 ```
 
 Open the dashboard, add feeds, pick an AI backend, and paste the write-API token from `data/dashboard.token` (created on first run if `DASHBOARD_TOKEN` is unset). GET reads stay open on localhost; saves and **Run digest** need the token.
+
+<p align="center">
+  <img src="docs/screenshots/carousel-dashboard.webp" alt="The dashboard, cycling through the Settings, Sources, Jev and Kindle tabs">
+</p>
+
+<details>
+<summary>Each dashboard tab</summary>
+
+| Settings | Sources |
+| --- | --- |
+| ![Settings tab: integrations and AI backend](docs/screenshots/dashboard-settings.png) | ![Sources tab: RSS feeds by category, each with an on/off switch](docs/screenshots/dashboard-sources.png) |
+| **Jev** | **Kindle** |
+| ![Jev tab: run list and the ranked topic table](docs/screenshots/dashboard-jev.png) | ![Kindle tab: Send-to-Kindle address and SMTP fields](docs/screenshots/dashboard-kindle.png) |
+
+</details>
 
 Then build a book:
 
@@ -109,6 +136,8 @@ Each phase works when its settings are present and is skipped when they are not.
 
 Set `KINDLE_EMAIL` (`you@kindle.com`) and Gmail SMTP. Use a [Google App Password](https://myaccount.google.com/apppasswords), not your normal password. Whitelist the sender under Amazon → Personal Document Settings.
 
+<img src="docs/screenshots/dashboard-kindle.png" width="70%" alt="Dashboard Kindle tab: Send-to-Kindle address and SMTP fields, with a test email button">
+
 Skip with `--no-kindle` or by turning off Kindle delivery in Settings.
 
 > [!WARNING]
@@ -125,6 +154,10 @@ Off by default. Enable them under Integrations, with `credentials.json` / `token
 ### Jev
 
 Off by default. Put a TypeSafe key or a Vercel AI Gateway `vck_…` key in `.env`, then turn on `jev_triage_enabled`. The Jev tab lists each classify run under `output/jev/`. Set `jev_min_keep` (for example `40` on the 0–100 scale) to drop weak stories.
+
+<img src="docs/screenshots/dashboard-jev.png" width="70%" alt="Dashboard Jev tab: run list and the ranked topic table">
+
+Drag topics in **Your topics** to rank them. Rank 1 counts most toward a story's relevance in the next digest.
 
 ## Daily run (macOS)
 
