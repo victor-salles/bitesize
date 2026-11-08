@@ -55,6 +55,7 @@ AI calls go through `ai.py` (`antigravity` / `gemini` / `ollama`). Prompts live 
 - **Tags / completeness / Safari Reader** — tags (`resumo` / `artigo-completo` + pt-BR temas) are in the digest. Safari Reader extract was measured and dropped. See [ROADMAP.md](ROADMAP.md) item 2.
 - **`wordflow/`** is a separate experimental Next.js app. Do not treat it as part of the digest unless the task names it.
 - **Published default is `main`.** Remote: `https://github.com/victor-salles/bitesize`. Do not commit `.env`, `data/`, or `output/`.
+- **Commits, branches and releases** follow `~/.claude/rules/git-conventions.md`: Conventional Commits, `main` as the only long-lived branch, SemVer tags with GitHub Releases (no CHANGELOG file). Use `/personal-commits`, `/personal-pr` and `/personal-release`. Before `v1.0.0` (the "Ready" bar in CONTEXT.md), breaking changes bump MINOR.
 
 ## Agent skills
 
