@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 from ebooklib import epub
 
 from ai_locale import ai_language_code, epub_label, format_digest_date, format_tag_line
-from config import OUTPUT_DIR, get_settings
+from config import get_settings
 from cover_art import render_magazine_cover
 from gemini import article_relevance, relevance_display
 from magazine_layers import (
@@ -895,5 +895,5 @@ def generate_epub(
     book.add_item(epub.EpubNcx())
     book.add_item(epub.EpubNav())
 
-    OUTPUT_DIR.mkdir(exist_ok=True)
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     epub.write_epub(str(output_path), book)
