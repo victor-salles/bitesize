@@ -21,3 +21,7 @@ htmlcov/
 coverage.xml
 .cursor-worker.log
 MOBILE_HANDOFF.local.md
+
+# Django server
+server/db.sqlite3*
+server/staticfiles/
