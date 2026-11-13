@@ -25,7 +25,7 @@ Agent entrypoint for BiteSIze. Humans start at [README.md](README.md). Direction
 
 ```bash
 source .venv/bin/activate
-pytest tests/ -v
+pytest -v
 python dashboard.py          # http://127.0.0.1:8765
 python main.py --all         # full digest
 python main.py --all --no-kindle --no-books
@@ -49,10 +49,11 @@ AI calls go through `ai.py` (`antigravity` / `gemini` / `ollama`). Prompts live 
 
 - **Single-user local tool.** Dashboard binds `127.0.0.1`. Do not expose it.
 - **Secrets stay off git:** `.env`, `data/`, `token.json`, `credentials.json`, `output/`.
-- **Tests first** for behavior changes. `pytest tests/ -v` is the gate.
+- **Tests first** for behavior changes. `pytest -v` is the gate.
 - **Delivery is best-effort.** Kindle/Books failures must not abort EPUB write.
 - **Stock Kindle has no JavaScript.** Internal links, covers, and reflowable HTML only. See `docs/research/2026-08-14-kindle-interactive-epub.md` before promising interactivity.
 - **Tags / completeness / Safari Reader** — tags (`resumo` / `artigo-completo` + pt-BR temas) are in the digest. Safari Reader extract was measured and dropped. See [ROADMAP.md](ROADMAP.md) item 2.
+- **`server/`** is the multi-user Django server (in progress). See [server/README.md](server/README.md).
 - **`wordflow/`** is a separate experimental Next.js app. Do not treat it as part of the digest unless the task names it.
 - **Published default is `main`.** Remote: `https://github.com/victor-salles/bitesize`. Do not commit `.env`, `data/`, or `output/`.
 - **Commits, branches and releases** follow `~/.claude/rules/git-conventions.md`: Conventional Commits, `main` as the only long-lived branch, SemVer tags with GitHub Releases (no CHANGELOG file). Use `/personal-commits`, `/personal-pr` and `/personal-release`. Before `v1.0.0` (the "Ready" bar in CONTEXT.md), breaking changes bump MINOR.
