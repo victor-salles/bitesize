@@ -1,6 +1,6 @@
 # Triage Labels
 
-The skills speak in terms of five canonical triage roles. This file maps those roles to the actual label strings used in Linear.
+The skills speak in terms of five canonical triage roles. This file maps those roles to the actual label strings used in GitHub Issues.
 
 | Label in mattpocock/skills | Label in our tracker | Meaning                                  |
 | -------------------------- | -------------------- | ---------------------------------------- |
@@ -12,4 +12,4 @@ The skills speak in terms of five canonical triage roles. This file maps those r
 
 When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from this table.
 
-Assignee follows the same split: `ready-for-human` → **Victor Salles**; `ready-for-agent` → **Cursor**. See `docs/agents/issue-tracker.md`.
+The label is also the owner: `ready-for-human` is Victor's, `ready-for-agent` is an agent's. See `docs/agents/issue-tracker.md`.
