@@ -22,7 +22,7 @@ Build a Django server that wraps the existing pipeline. Do not rewrite the pipel
 | API | None for now; no Django REST Framework | Nothing consumes an API yet. Add DRF when something does. |
 | Login | Name + short PIN, long-lived session | Typing a password on the Kindle keyboard is painful, and the Kindle has no mail app for magic links. |
 | Database | SQLite on a persistent volume | Friends-sized load; saves RAM on the 1 GB droplet. |
-| Background work | `django-tasks` database backend, one worker, one edition at a time | Fits the droplet's memory. Users see their place in the queue and the expected wait ([#64](https://github.com/victor-salles/bitesize/issues/64)). |
+| Background work | Django's built-in tasks with the `django-tasks-db` database backend, one worker, one edition at a time | Fits the droplet's memory. Users see their place in the queue and the expected wait ([#64](https://github.com/victor-salles/bitesize/issues/64)). |
 | Scheduling | A management command run by Dokku cron enqueues due users | Django has no scheduler of its own. |
 | AI | Gemini with the server's key; summaries cached per article | A story followed by several users is processed once. |
 | Email | A transactional provider sending from `victorsalles.com` | Gmail SMTP limits and deliverability. Each user approves the sender once in Amazon, guided by the app ([#60](https://github.com/victor-salles/bitesize/issues/60)). |
