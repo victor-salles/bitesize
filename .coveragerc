@@ -4,6 +4,8 @@ omit =
     .venv/*
     wordflow/*
     tests/*
+    server/tests/*
+    server/manage.py
     bitesize.js
     conftest.py
 

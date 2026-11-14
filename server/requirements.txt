@@ -1,0 +1,5 @@
+# Server-only dependencies. The image installs these on top of ../requirements.txt.
+Django>=6.1.2,<6.2
+django-tasks-db>=0.13.0,<0.14
+gunicorn>=26.2.0,<27
+whitenoise>=6.12.0,<7
