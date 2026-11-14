@@ -8,7 +8,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable
 
-from config import console, get_settings
+from config import console, get_settings, submit_in_context
 from jev_log import write_run
 from jev_policy import judgment_from_answers
 from jev_questions import article_state, news_questions, tema_nouls
@@ -289,7 +289,7 @@ def classify_articles(
         return index, classified
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = [pool.submit(_one, i, art) for i, art in enumerate(articles)]
+        futures = [submit_in_context(pool, _one, i, art) for i, art in enumerate(articles)]
         for fut in as_completed(futures):
             i, classified = fut.result()
             out[i] = classified

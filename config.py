@@ -1,5 +1,8 @@
+import contextvars
 import os
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator
 
 from rich.console import Console
 
@@ -14,8 +17,32 @@ console = Console()
 
 _settings: Settings | None = None
 
+# Settings installed by use_settings() win over the database for the current
+# context, so a caller (one edition per user) never touches data/bitesize.db.
+_settings_override: contextvars.ContextVar[Settings | None] = contextvars.ContextVar(
+    "bitesize_settings_override", default=None
+)
+
+
+@contextmanager
+def use_settings(settings: Settings) -> Iterator[Settings]:
+    """Make get_settings() return *settings* inside this block (context-local)."""
+    token = _settings_override.set(settings)
+    try:
+        yield settings
+    finally:
+        _settings_override.reset(token)
+
+
+def submit_in_context(pool, fn, *args, **kwargs):
+    """pool.submit that carries the caller's context (and so its settings) into the worker."""
+    return pool.submit(contextvars.copy_context().run, fn, *args, **kwargs)
+
 
 def get_settings() -> Settings:
+    override = _settings_override.get()
+    if override is not None:
+        return override
     global _settings
     if _settings is None:
         settings_store.init_db()

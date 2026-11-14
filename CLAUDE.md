@@ -37,7 +37,7 @@ Daily run: `scripts/install-daily-launchd.sh` → `main.py --all` at 06:50. Logs
 
 ## Pipeline
 
-`main.py` is the only orchestrator:
+`pipeline.build_edition(EditionConfig)` builds one EPUB from explicit inputs (no `.env` or database reads). `main.py` loads settings and sources, fetches Gmail/Calendar, calls it, then delivers:
 
 RSS (parallel) → full text + paywall mirrors → AI filter/summarize/score → section + global covers → EPUB → Kindle SMTP → iCloud Books.
 
@@ -62,9 +62,9 @@ AI calls go through `ai.py` (`antigravity` / `gemini` / `ollama`). Prompts live 
 
 ### Issue tracker
 
-Linear (workspace Victor Salles). See `docs/agents/issue-tracker.md`.
+GitHub Issues, with planned work on the [BiteSIze Server board](https://github.com/users/victor-salles/projects/3). See `docs/agents/issue-tracker.md`. Victor’s comments and description edits on an issue are his response.
 
-Victor’s comments and description edits on Linear are his response. When you need them, run `python scripts/linear-review-inbox.py` if OAuth client credentials are in `.env` — not at session start. Otherwise use Linear MCP. See `.cursor/skills/linear-review-inbox/SKILL.md`.
+Decisions are recorded as ADRs in `docs/adr/`.
 
 ### Triage labels
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import threading
 from datetime import datetime
+from pathlib import Path
 from typing import Callable
 from urllib.parse import quote
 
@@ -124,10 +125,11 @@ def format_summary() -> str:
     return "\n".join(lines)
 
 
-def log_summary(console=None) -> None:
+def log_summary(console=None, log_dir: Path | None = None) -> None:
     """Append paywall stats to output/logs and print a one-line summary."""
     summary = format_summary()
-    log_dir = OUTPUT_DIR / "logs"
+    if log_dir is None:
+        log_dir = OUTPUT_DIR / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / "paywall-stats.log"
     stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
