@@ -1,58 +1,56 @@
-# Issue tracker: Linear
+# Issue tracker: GitHub
 
-Issues and specs for this repo live in Linear. Workspace: [Victor Salles](https://linear.app/victor-salles). Team: **Victor Salles**. Use the Linear MCP (`save_issue`, `get_issue`, `list_issues`, `save_comment`) for all operations.
+Issues live in GitHub Issues on [victor-salles/bitesize](https://github.com/victor-salles/bitesize/issues). Planned work is on the [BiteSIze Server](https://github.com/users/victor-salles/projects/3) project board. Use the `gh` CLI.
+
+Linear was the tracker until 2026-11-13. Old `VIC-*` links in the docs still point there; do not open new Linear tickets.
 
 ## Conventions
 
-- **Create an issue**: `save_issue` with `team` = `Victor Salles`, a title, a markdown description, and an **assignee** (see below). Do not escape newlines.
-- **Read an issue**: `get_issue` with the identifier (e.g. `VIC-12`).
-- **List issues**: `list_issues`, scoped with `team` and labels. Victor’s queue is `assignee` = `Victor Salles`. Cursor’s queue is `assignee` = `Cursor`. Do not use `me` — it follows whoever is logged into Linear, so it mixes the two queues.
-- **Comment**: `save_comment` with `issueId` and `body`.
-- **Apply / remove labels**: `save_issue` `addLabels` / `removeLabels`. Replacing the full set uses `labels`.
-- **Close**: `save_issue` with `state` = `Done`.
+- **Create:** `gh issue create --repo victor-salles/bitesize --title … --body-file … --label <triage label>`, then add it to the board: `gh project item-add 3 --owner victor-salles --url <issue url>`. Use a milestone when the work belongs to one (e.g. `Server MVP`).
+- **Read:** `gh issue view <number> --comments`.
+- **List:** `gh issue list --label ready-for-agent` for the agent queue, `--label ready-for-human` for Victor's.
+- **Comment:** `gh issue comment <number> --body-file …`.
+- **Labels:** `gh issue edit <number> --add-label … --remove-label …`.
+- **Close:** a PR with `Closes #<number>` closes it on merge. Close by hand only for won't-fix or duplicates.
 
-## Assignee
+## Who owns what
 
-**One ticket, one owner.** Assignee is how Victor’s work and Cursor’s work stay on separate lists. Do not put a decision and an implementation on the same issue.
+**One issue, one owner**, shown by the triage label.
 
-| Assignee | Owns |
-| --- | --- |
-| `Victor Salles` | Decisions, grilling, review, and anything labelled `ready-for-human`. The map issue itself. |
-| `Cursor` | Research, tasks, and execution labelled `ready-for-agent`. |
+| Label | Owner | Covers |
+|---|---|---|
+| `ready-for-human` | Victor | Decisions, design, review, releases. |
+| `ready-for-agent` | Agent | Research, tasks, implementation. |
 
-If a ticket needs both a human answer and later agent work, keep the question on Victor’s issue and open a **new** child assigned to Cursor once the answer exists. Do not reassign Victor’s ticket to Cursor to “start coding.” Do not use Linear’s Delegate field for this split.
-
-Infer the workspace from the connected Linear MCP; do not switch teams unless the user names another one.
+If an issue needs a human answer before agent work, keep the question on Victor's issue and open a new `ready-for-agent` issue once the answer exists.
 
 ## Review handshake
 
-Victor’s response is a **comment or a description edit** on a Linear issue, not chat and not a status. Read those as the spec.
-
-When you need to know what he said, run `python scripts/linear-review-inbox.py` if `.env` has OAuth client credentials (see `.cursor/skills/linear-review-inbox/SKILL.md`). Do not run it automatically at session start. If the script has no credentials, use Linear MCP instead — Cursor is already signed in. After absorbing, `--mark-seen` when the script was used, comment if you acted, and move the ticket on (`Done` when the question is answered).
+Victor's answer is a **comment or a description edit** on the issue. Read those as the spec: `gh issue view <number> --comments`.
 
 ## Writing
 
-Issue bodies follow writing-around-code: lead with the problem or decision in plain language. The code already holds the mechanics. Name files only when they earn their place. Wayfinder tickets still carry a **Question** (and an **Answer** when resolved); those sections are prose, not a task list.
+Issue bodies follow writing-around-code: lead with the problem or decision in plain language and end with a **Done when** line. Name files only when they earn their place.
 
-## Pull requests as a triage surface
+## Pull requests
 
-**PRs as a request surface: no.**
+- Branch, commit and PR-title rules are in [CONTRIBUTING.md](../../CONTRIBUTING.md).
+- The PR body says `Closes #<number>`.
+- PRs are not a place to request new work; open an issue.
 
 ## When a skill says "publish to the issue tracker"
 
-Create a Linear issue on team Victor Salles.
+Create a GitHub issue as above.
 
 ## When a skill says "fetch the relevant ticket"
 
-`get_issue` on the identifier or URL the user passed.
+`gh issue view` on the number or URL the user passed.
 
 ## Wayfinding operations
 
-Used by `/wayfinder`. The **map** is a single Linear issue with **child** issues as tickets.
+Used by `/wayfinder`. The **map** is one issue labelled `wayfinder:map`; tickets are its sub-issues.
 
-- **Map**: a single issue labelled `wayfinder:map`, holding the Notes / Decisions-so-far / Fog body. Create with `save_issue`, `assignee: "Victor Salles"`, and `addLabels: ["wayfinder:map"]`.
-- **Child ticket**: `save_issue` with `parentId` set to the map’s identifier, plus labels `wayfinder:<type>` (`research` / `prototype` / `grilling` / `task`), and an assignee from the table above. Grilling and `ready-for-human` go to Victor Salles. Research, tasks, and agent execution go to Cursor.
-- **Blocking**: Linear’s native `blockedBy` / `blocks` on `save_issue`. A ticket is unblocked when every blocker is **Done**.
-- **Frontier for Cursor**: the map’s open children assigned to **Cursor** that have no open blocker; first in map order wins. Victor’s tickets are not the agent frontier even if they are unblocked.
-- **Claim (Cursor)**: the ticket is already assigned to Cursor; set `state: "In Progress"`. Do not steal a Victor Salles ticket by reassigning it.
-- **Resolve**: `save_comment` with the answer, `state: "Done"`, then append a context pointer (gist + Linear URL) to the map’s Decisions-so-far.
+- **Child ticket:** create the issue, then link it as a sub-issue of the map (`gh api` on the sub-issues endpoint), labelled `wayfinder:<type>` plus a triage label.
+- **Blocking:** write `Blocked by #<n>` in the body. A ticket is unblocked when every blocker is closed.
+- **Frontier for agents:** the map's open `ready-for-agent` children with no open blocker; first in map order wins.
+- **Resolve:** comment with the answer, close the issue, and add a pointer to the map's Decisions-so-far.

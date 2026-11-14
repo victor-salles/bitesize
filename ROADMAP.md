@@ -19,6 +19,10 @@ The morning pipeline is in daily use: RSS → full text → AI filter/summarize/
 
 The dashboard **Preview** tab now loads live headlines per source. The header **Run digest** button starts the same `--all` job as the morning run and lists each pipeline step with a live log. **Jev** tab lists each classify run and the JSON file under `output/jev/`. English chrome by default (`ui_language` / localStorage); Rel, Ad, and per-theme scores use percent + bar (no Keep column or rel/keep/ad filter sliders). You can correct Ad, Rel, Tipo, Temas, and the extra scores per story; **Export labels** writes a gold file for later question/threshold work. Still missing: last-digest preview, AI summary preview, magazine cover preview, Jev field picker.
 
+## Now
+
+**A multi-user server for friends.** Accounts, per-user sources and delivery, all set up from the Kindle browser. Decision: [ADR 0001](docs/adr/0001-django-server.md). Work: [BiteSIze Server board](https://github.com/users/victor-salles/projects/3).
+
 ## Next
 
 1. **A smaller morning book.** Daily runs land 120–140 articles. Relevance sorting exists; Jev `jev_min_keep` is a minimum compiled relevance (0–100) — `40` is a reasonable cutoff on the ranked-theme scale. A dedicated “top stories only” EPUB is still optional.
