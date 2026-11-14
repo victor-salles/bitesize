@@ -37,7 +37,7 @@ Daily run: `scripts/install-daily-launchd.sh` → `main.py --all` at 06:50. Logs
 
 ## Pipeline
 
-`main.py` is the only orchestrator:
+`pipeline.build_edition(EditionConfig)` builds one EPUB from explicit inputs (no `.env` or database reads). `main.py` loads settings and sources, fetches Gmail/Calendar, calls it, then delivers:
 
 RSS (parallel) → full text + paywall mirrors → AI filter/summarize/score → section + global covers → EPUB → Kindle SMTP → iCloud Books.
 
