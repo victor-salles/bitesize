@@ -25,3 +25,4 @@ MOBILE_HANDOFF.local.md
 # Django server
 server/db.sqlite3*
 server/staticfiles/
+server/media/

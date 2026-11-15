@@ -4,6 +4,8 @@ Every deploy-specific value comes from an environment variable; see server/READM
 """
 
 import os
+import sys
+from datetime import timedelta
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
@@ -11,6 +13,12 @@ from django.core.exceptions import ImproperlyConfigured
 from .env import env_bool, env_int, env_list
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# The digest pipeline (pipeline.py and friends) lives at the repo root, one level
+# above server/. `manage.py` and gunicorn only put server/ on the path.
+REPO_ROOT = BASE_DIR.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.append(str(REPO_ROOT))
 
 DEBUG = env_bool("DJANGO_DEBUG", default=False)
 
@@ -35,6 +43,8 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django_tasks_db",
     "core",
+    "sources",
+    "editions",
     "articles",
 ]
 
@@ -93,6 +103,11 @@ TASKS = {
         "QUEUES": ["default"],
     }
 }
+
+# Built EPUBs go to EDITIONS_DIR/<user id>/<date>/.
+EDITIONS_DIR = Path(os.environ.get("DJANGO_EDITIONS_DIR") or BASE_DIR / "media" / "editions")
+# A running edition older than this lost its worker; the next task marks it failed.
+EDITION_STALE_AFTER = timedelta(hours=2)
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
