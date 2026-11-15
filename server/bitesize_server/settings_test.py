@@ -5,3 +5,6 @@ import os
 os.environ.setdefault("DJANGO_SECRET_KEY", "test-only-not-a-real-key")
 
 from .settings import *  # noqa: E402,F403
+
+# PINs are hashed with PBKDF2 in production; tests only need a hash, fast.
+PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]

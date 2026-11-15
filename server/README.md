@@ -32,6 +32,16 @@ The SQLite file defaults to `server/db.sqlite3` (gitignored).
 | `DJANGO_DB_PATH` | `server/db.sqlite3` (`/app/data/server.sqlite3` in the image) | SQLite file path |
 | `DJANGO_TIME_ZONE` | `UTC` | |
 | `DJANGO_LOG_LEVEL` | `INFO` | |
+| `DJANGO_SESSION_DAYS` | `365` | How long a login lasts |
+| `DJANGO_LOGIN_FAILURES_PER_ACCOUNT` | `5` | Failed PINs before the account locks |
+| `DJANGO_LOGIN_FAILURES_PER_IP` | `20` | Failed PINs before the client IP locks |
+| `DJANGO_LOGIN_LOCKOUT_MINUTES` | `15` | Lock length, counted from the last failure |
+
+## Accounts
+
+The `accounts` app handles sign-up (name, Send-to-Kindle address, 4–6 digit PIN), login and logout. The PIN is stored as Django's password hash; trivial PINs (`1234`, `0000`, `9876`) are refused. Names are unique and matched case-insensitively. Pages extend `server/templates/base.html`: plain forms, no JavaScript, large tap targets for the Kindle browser.
+
+Failed logins are counted per account and per client IP in Django's cache. The cache is `DatabaseCache` in the SQLite file, not the default in-process `LocMemCache`: gunicorn runs two workers, and per-process counters would let an attacker get double the attempts and lose them on every restart. A database cache needs no extra service on the droplet. Migration `accounts/0001` creates the table, so `migrate` stays the only deploy step. The client IP is the rightmost `X-Forwarded-For` entry, the one Dokku's nginx writes.
 
 ## Processes
 

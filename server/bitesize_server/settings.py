@@ -8,7 +8,7 @@ from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
 
-from .env import env_bool, env_list
+from .env import env_bool, env_int, env_list
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django_tasks_db",
     "core",
+    "accounts",
 ]
 
 MIDDLEWARE = [
@@ -53,7 +54,7 @@ ROOT_URLCONF = "bitesize_server.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -82,6 +83,17 @@ DATABASES = {
     }
 }
 
+# Login lockout counters (accounts.throttle) must be shared by every gunicorn
+# worker, so the cache lives in the SQLite database rather than in process
+# memory: no extra service on the 1 GB droplet, and counts survive restarts.
+# accounts/migrations/0001 creates the table, so `migrate` is enough.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "django_cache",
+    }
+}
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Background work runs through Django's tasks framework, stored in the database
@@ -99,6 +111,19 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
+
+# Kindle login: name + PIN, then stay signed in. Typing on the Kindle is slow.
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "home"
+LOGOUT_REDIRECT_URL = "login"
+SESSION_COOKIE_AGE = env_int("DJANGO_SESSION_DAYS", default=365) * 24 * 60 * 60
+
+# Failed PIN attempts allowed before a lock, and how long the lock lasts after
+# the last failure. A 4-digit PIN has 10,000 values; 5 tries per 15 minutes
+# per account keeps a full search over a year away.
+LOGIN_FAILURES_PER_ACCOUNT = env_int("DJANGO_LOGIN_FAILURES_PER_ACCOUNT", default=5)
+LOGIN_FAILURES_PER_IP = env_int("DJANGO_LOGIN_FAILURES_PER_IP", default=20)
+LOGIN_LOCKOUT_SECONDS = env_int("DJANGO_LOGIN_LOCKOUT_MINUTES", default=15) * 60
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = os.environ.get("DJANGO_TIME_ZONE", "UTC")
