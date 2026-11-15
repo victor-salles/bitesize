@@ -49,13 +49,7 @@ python server/manage.py add_starter_sources <username> [--category Tech ...]
 
 The server calls the Gemini API directly (`articles.gemini.GeminiClient`, an `ai.AIClient`). Summaries, scores, tags and ad skips are cached in `core.Article` per URL and language (`articles.cache.DatabaseArticleCache`), so an article several users follow goes to Gemini once. A cached row is reused while the article's text hash matches. Section and global covers are per user and are not cached.
 
-Build an edition with both:
-
-```python
-from articles.services import get_article_cache, get_server_ai_client
-
-EditionConfig(..., ai=get_server_ai_client(), article_cache=get_article_cache())
-```
+`editions.services.edition_config()` gives every queued edition both (`articles.services.get_server_ai_client()` and `get_article_cache()`).
 
 Daily request counts are in the admin under *AI usage*.
 

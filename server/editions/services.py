@@ -146,7 +146,9 @@ def build_claimed_edition(edition: Edition) -> str:
 
 
 def edition_config(edition: Edition):
-    """The pipeline inputs for `edition`, from its user's profile and active sources."""
+    """The pipeline inputs for `edition`: its user's profile and active sources, the
+    server's Gemini client and the article cache shared by every user."""
+    from articles.services import get_article_cache, get_server_ai_client
     from pipeline import EditionConfig
 
     profile = edition.user.profile
@@ -155,7 +157,8 @@ def edition_config(edition: Edition):
         output_dir=edition_dir(edition),
         language=profile.language,
         now=timezone.localtime(timezone.now(), ZoneInfo(profile.timezone)),
-        # ai=None: the pipeline's default client until #65 sets the server's Gemini client.
+        ai=get_server_ai_client(),
+        article_cache=get_article_cache(),
     )
 
 
