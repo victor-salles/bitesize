@@ -1,5 +1,6 @@
 from datetime import date, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from django.contrib.auth.models import User
@@ -9,8 +10,10 @@ from django.utils import timezone
 from django_tasks_db.models import DBTaskResult
 
 import pipeline
+from articles.cache import DatabaseArticleCache
+from articles.gemini import GeminiClient
 from core.models import Edition, Source
-from editions.services import enqueue_edition, retry_edition
+from editions.services import edition_config, enqueue_edition, retry_edition
 from editions.signals import edition_built
 from editions.tasks import build_user_edition
 
@@ -155,7 +158,8 @@ def test_run_builds_the_edition_from_the_users_profile_and_sources(ana, fake_pip
     (config,) = fake_pipeline.calls
     assert config.sources == {"World": {"BBC": "https://bbc.co.uk/ana"}}
     assert config.language == "en"
-    assert config.ai is None  # shared default client until #65
+    assert isinstance(config.ai, GeminiClient)
+    assert isinstance(config.article_cache, DatabaseArticleCache)
     assert Path(config.output_dir) == editions_dir / str(ana.pk) / "2026-11-14"
     assert Path(config.output_dir).is_dir()
     assert edition.epub_path == str(Path(config.output_dir) / "digest.epub")
@@ -338,3 +342,28 @@ def test_admin_action_retries_only_failed_editions(admin_client):
     assert done.status == Edition.Status.SUCCEEDED
     assert [t.args_kwargs["args"] for t in ready_tasks()] == [[failed.pk]]
     assert "1 failed edition" in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_edition_config_sends_ai_through_the_server_gemini_client(ana, settings, monkeypatch):
+    settings.GEMINI_API_KEY = "test-key"
+    settings.GEMINI_MODEL = "gemini-test"
+    requests = []
+
+    class FakeModels:
+        def generate_content(self, *, model, contents, config):
+            requests.append((model, contents))
+            return SimpleNamespace(text="summary")
+
+    from_settings = GeminiClient.from_settings.__func__
+    monkeypatch.setattr(
+        GeminiClient,
+        "from_settings",
+        classmethod(lambda cls: from_settings(cls, sdk=SimpleNamespace(models=FakeModels()))),
+    )
+
+    config = edition_config(Edition.objects.create(user=ana, edition_date=DAY))
+
+    assert config.ai.call("Summarise", "article text") == "summary"
+    assert requests == [("gemini-test", "article text")]
+    assert isinstance(config.article_cache, DatabaseArticleCache)

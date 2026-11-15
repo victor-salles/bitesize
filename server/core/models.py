@@ -172,6 +172,10 @@ class Article(models.Model):
     text_hash = models.CharField(max_length=64, blank=True)
     summary = models.TextField(blank=True)
     score = models.FloatField(null=True, blank=True)
+    # The AI dropped it as an ad or sponsored post: leave it out of every edition.
+    skipped = models.BooleanField(default=False)
+    # {"tipo": ..., "temas": [...]}, as in tags.normalize_tags.
+    tags = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
