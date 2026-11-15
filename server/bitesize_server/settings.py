@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django_tasks_db",
     "core",
+    "sources",
 ]
 
 MIDDLEWARE = [
