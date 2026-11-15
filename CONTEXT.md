@@ -35,3 +35,19 @@ _Avoid_: Open-source ready, public, launched
 **Seed**:
 The first-run values in `.env` and `sources.json`. After the first migrate, the local database is the source of truth.
 _Avoid_: Config (when you mean the live database settings)
+
+**Server**:
+The multi-user Django app in `server/` that runs the Digest once per user. See `docs/adr/0001-django-server.md`.
+_Avoid_: Dashboard (that is the local Flask UI), backend
+
+**Source**:
+One RSS feed a user follows, filed under a category. A user's active sources become `EditionConfig.sources`.
+_Avoid_: Feed (when you mean the user's saved entry), subscription
+
+**Edition**:
+One user's Digest for one date: its place in the queue, the EPUB it built, and whether it reached the Kindle. One per user per date.
+_Avoid_: Run, job, issue (of a magazine)
+
+**Article cache**:
+AI output (summary, score) stored per article URL and language, shared by every user whose Edition includes that article.
+_Avoid_: Article (when you mean a user's copy), summary store
