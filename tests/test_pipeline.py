@@ -131,3 +131,82 @@ def test_build_edition_without_readable_articles_writes_nothing(
     assert result.epub_path is None
     assert result.raw_count == 0
     assert not list(tmp_path.glob("*.epub"))
+
+
+class MemoryCache:
+    """In-memory ArticleCache keyed by (url, language)."""
+
+    def __init__(self):
+        self.rows = {}
+
+    def get(self, art, language):
+        return self.rows.get((art["url"], language))
+
+    def put(self, art, language, result):
+        self.rows[(art["url"], language)] = result
+
+
+def _edition(tmp_path, ai, cache, language="en"):
+    return build_edition(
+        EditionConfig(
+            sources={"Economy": {"Wire": "https://feeds.example.com/rss"}},
+            output_dir=tmp_path,
+            settings=Settings(ai_backend="does-not-exist"),
+            language=language,
+            ai=ai,
+            article_cache=cache,
+            now=datetime(2026, 11, 13, 7, 0),
+        )
+    )
+
+
+def _summary_calls(ai):
+    return [l for l in ai.labels if l == ""]
+
+
+def test_article_cache_reuses_summaries_and_skips_across_editions(
+    tmp_path, monkeypatch, no_global_config
+):
+    monkeypatch.setattr(feed, "_download_url", lambda url, quiet=False: RSS)
+    monkeypatch.setattr(pipeline, "fetch_article_content", lambda url: BODY)
+    cache = MemoryCache()
+
+    first_ai = FakeAI()
+    first = _edition(tmp_path / "a", first_ai, cache)
+    second_ai = FakeAI()
+    second = _edition(tmp_path / "b", second_ai, cache)
+
+    assert len(_summary_calls(first_ai)) == 1
+    assert _summary_calls(second_ai) == []
+    assert cache.rows[("https://example.com/ad", "en")] == {"skip": True}
+    hit = cache.rows[("https://example.com/a", "en")]
+    assert hit["summary"] == "The bank held rates. Markets were calm."
+    assert {"relevance", "tipo", "temas"} <= hit.keys()
+    assert first.kept_count == second.kept_count == 2
+
+
+def test_article_cache_is_per_language(tmp_path, monkeypatch, no_global_config):
+    monkeypatch.setattr(feed, "_download_url", lambda url, quiet=False: RSS)
+    monkeypatch.setattr(pipeline, "fetch_article_content", lambda url: BODY)
+    cache = MemoryCache()
+
+    _edition(tmp_path / "en", FakeAI(), cache, language="en")
+    pt_ai = FakeAI()
+    _edition(tmp_path / "pt", pt_ai, cache, language="pt-BR")
+
+    assert len(_summary_calls(pt_ai)) == 1
+
+
+def test_article_cache_does_not_store_fallback_results(tmp_path, monkeypatch, no_global_config):
+    monkeypatch.setattr(feed, "_download_url", lambda url, quiet=False: RSS)
+    monkeypatch.setattr(pipeline, "fetch_article_content", lambda url: BODY)
+
+    class DownAI(FakeAI):
+        def available(self):
+            return False
+
+    cache = MemoryCache()
+    result = _edition(tmp_path, DownAI(), cache)
+
+    assert cache.rows == {}
+    assert result.kept_count == 3  # no-summary edition keeps everything
