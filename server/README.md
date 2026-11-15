@@ -43,7 +43,9 @@ The server calls the Gemini API directly (`articles.gemini.GeminiClient`, an `ai
 Build an edition with both:
 
 ```python
-EditionConfig(..., ai=GeminiClient.from_settings(), article_cache=DatabaseArticleCache())
+from articles.services import get_article_cache, get_server_ai_client
+
+EditionConfig(..., ai=get_server_ai_client(), article_cache=get_article_cache())
 ```
 
 Daily request counts are in the admin under *AI usage*.

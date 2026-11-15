@@ -229,3 +229,19 @@ def test_cap_reached_falls_back_to_the_no_summary_edition(tmp_path, same_feed):
     assert result.epub_path is not None and result.epub_path.exists()
     assert result.kept_count == 2  # nothing filtered without AI
     assert Article.objects.count() == 0  # fallback scores are not cached
+
+
+# ── Factories for the edition build ──────────────────────────────────────────
+
+
+@pytest.mark.django_db
+def test_factories_give_the_configured_client_and_the_database_cache(settings):
+    from articles.services import get_article_cache, get_server_ai_client
+
+    settings.GEMINI_API_KEY = "k"
+    settings.GEMINI_MODEL = "gemini-other"
+
+    client = get_server_ai_client()
+
+    assert isinstance(client, GeminiClient) and client.model == "gemini-other"
+    assert isinstance(get_article_cache(), DatabaseArticleCache)
