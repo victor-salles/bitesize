@@ -32,6 +32,9 @@ def env_int(name: str, default: int) -> int:
     if raw is None or not raw.strip():
         return default
     try:
-        return int(raw)
+        value = int(raw)
     except ValueError:
         raise ImproperlyConfigured(f"{name} must be an integer, got {raw!r}") from None
+    if value < 1:
+        raise ImproperlyConfigured(f"{name} must be at least 1, got {raw!r}")
+    return value

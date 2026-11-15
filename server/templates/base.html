@@ -1,0 +1,45 @@
+{% comment %}
+Shared layout. Server-rendered, no JavaScript: the stock Kindle browser has none.
+Pages fill {% block title %} and {% block content %}. #59 restyles this from the design.
+{% endcomment %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}BiteSIze{% endblock %}</title>
+<style>
+  body { margin: 0 auto; max-width: 40rem; padding: 1rem; font-family: Georgia, serif; font-size: 1.25rem; line-height: 1.5; color: #000; background: #fff; }
+  a { color: #000; }
+  header, nav, footer { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; }
+  label { display: block; margin-top: 1rem; font-weight: bold; }
+  input, button, select { box-sizing: border-box; width: 100%; min-height: 3rem; padding: 0.5rem; font: inherit; border: 2px solid #000; background: #fff; color: #000; }
+  button { margin-top: 1.5rem; font-weight: bold; }
+  nav a, nav button { display: inline-block; min-height: 3rem; padding: 0.5rem 1rem; }
+  nav form button { width: auto; margin: 0; }
+  .helptext { display: block; font-size: 1rem; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border-bottom: 1px solid #000; padding: 0.5rem; text-align: left; vertical-align: top; word-break: break-all; }
+  .errorlist { margin: 0.5rem 0; padding: 0.5rem; border: 2px solid #000; list-style: none; font-weight: bold; }
+</style>
+</head>
+<body>
+<header>
+  <a href="{% url 'home' %}"><strong>BiteSIze</strong></a>
+  <nav aria-label="Account">
+    {% if user.is_authenticated %}
+      <span>{{ user.username }}</span>
+      {% if user.is_staff %}<a href="{% url 'invites' %}">Invites</a>{% endif %}
+      <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">Log out</button></form>
+    {% else %}
+      <a href="{% url 'login' %}">Log in</a>
+    {% endif %}
+  </nav>
+</header>
+<main>
+  {% if messages %}
+    <ul role="status">{% for message in messages %}<li>{{ message }}</li>{% endfor %}</ul>
+  {% endif %}
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

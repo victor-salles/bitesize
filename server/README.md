@@ -40,10 +40,25 @@ python server/manage.py add_starter_sources <username> [--category Tech ...]
 | `DJANGO_DB_PATH` | `server/db.sqlite3` (`/app/data/server.sqlite3` in the image) | SQLite file path |
 | `DJANGO_TIME_ZONE` | `UTC` | |
 | `DJANGO_LOG_LEVEL` | `INFO` | |
+| `DJANGO_SESSION_DAYS` | `365` | How long a login lasts |
+| `DJANGO_LOGIN_FAILURES_PER_ACCOUNT` | `5` | Failed PINs before the account locks |
+| `DJANGO_LOGIN_FAILURES_PER_IP` | `20` | Failed PINs before the client IP locks |
+| `DJANGO_LOGIN_LOCKOUT_MINUTES` | `15` | Lock length, counted from the last failure |
+| `DJANGO_INVITE_DAYS` | `14` | How long a sign-up invite stays valid |
 | `DJANGO_EDITIONS_DIR` | `server/media/editions` (`/app/data/editions` in the image) | Built EPUBs, under `<user id>/<date>/` |
 | `GEMINI_API_KEY` | empty | Server's Gemini API key. Empty means no AI: editions build without summaries. Set it with `dokku config:set`, never in git |
 | `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Any current Gemini model code |
 | `GEMINI_DAILY_REQUEST_CAP` | `200` | Gemini requests per day (server time zone), covers included. Past it, editions build without summaries |
+
+## Accounts
+
+The `accounts` app handles sign-up (name, Send-to-Kindle address, 4–6 digit PIN), login and logout.
+
+Sign-up is invite-only. Staff create single-use links at `/invites/` (or in the admin); a link works at `/signup/<token>/` until it is used, revoked or expired. Every other sign-up URL shows the same "you need an invite" page, without saying why. The invite is spent in the same transaction that creates the user.
+
+There is no self-service PIN reset. Staff reset a PIN in the admin (Users → the user → "Reset password"): for non-staff users it takes a 4–6 digit PIN; staff accounts keep Django's password validators. The PIN is stored as Django's password hash; trivial PINs (`1234`, `0000`, `9876`) are refused. Names are unique and matched case-insensitively. Pages extend `server/templates/base.html`: plain forms, no JavaScript, large tap targets for the Kindle browser.
+
+Failed logins are counted per account and per client IP in Django's cache. The cache is `DatabaseCache` in the SQLite file, not the default in-process `LocMemCache`: gunicorn runs two workers, and per-process counters would let an attacker get double the attempts and lose them on every restart. A database cache needs no extra service on the droplet. Migration `accounts/0001` creates the table, so `migrate` stays the only deploy step. The client IP is the rightmost `X-Forwarded-For` entry, the one Dokku's nginx writes.
 
 ## AI and the article cache
 

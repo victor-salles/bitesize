@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block content %}
+{# Placeholder until the tabbed interface (#59) lands. #}
+<h1>Hello, {{ user.username }}</h1>
+<p>Editions go to <strong>{{ user.profile.kindle_email|default:"no Kindle address yet" }}</strong>.</p>
+{% endblock %}
