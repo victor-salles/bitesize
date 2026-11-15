@@ -17,6 +17,14 @@ python server/manage.py db_worker            # task worker, in a second shell
 
 The SQLite file defaults to `server/db.sqlite3` (gitignored).
 
+## News sources
+
+`/sources/` (login required) lists a user's feeds and lets them add one by URL (checked as RSS/Atom with feedparser, 10 s timeout), turn it on or off, remove it, or pick from the starter catalogue. The catalogue is the repo's `sources.json`, read at runtime. To give a user the whole catalogue:
+
+```bash
+python server/manage.py add_starter_sources <username> [--category Tech ...]
+```
+
 ## Tests
 
 `pytest` from the repo root runs the CLI tests and `server/tests/` together (see `pytest.ini`).
