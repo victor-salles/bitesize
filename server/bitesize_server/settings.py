@@ -4,6 +4,8 @@ Every deploy-specific value comes from an environment variable; see server/READM
 """
 
 import os
+import sys
+from datetime import timedelta
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
@@ -11,6 +13,12 @@ from django.core.exceptions import ImproperlyConfigured
 from .env import env_bool, env_int, env_list
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# The digest pipeline (pipeline.py and friends) lives at the repo root, one level
+# above server/. `manage.py` and gunicorn only put server/ on the path.
+REPO_ROOT = BASE_DIR.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.append(str(REPO_ROOT))
 
 DEBUG = env_bool("DJANGO_DEBUG", default=False)
 
@@ -36,6 +44,9 @@ INSTALLED_APPS = [
     "django_tasks_db",
     "core",
     "accounts",
+    "sources",
+    "editions",
+    "articles",
 ]
 
 MIDDLEWARE = [
@@ -105,6 +116,11 @@ TASKS = {
     }
 }
 
+# Built EPUBs go to EDITIONS_DIR/<user id>/<date>/.
+EDITIONS_DIR = Path(os.environ.get("DJANGO_EDITIONS_DIR") or BASE_DIR / "media" / "editions")
+# A running edition older than this lost its worker; the next task marks it failed.
+EDITION_STALE_AFTER = timedelta(hours=2)
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
@@ -151,3 +167,8 @@ LOGGING = {
     "handlers": {"console": {"class": "logging.StreamHandler"}},
     "root": {"handlers": ["console"], "level": os.environ.get("DJANGO_LOG_LEVEL", "INFO")},
 }
+
+# Server AI: Gemini API with the server's key (see server/README.md).
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL") or "gemini-3.5-flash-lite"
+GEMINI_DAILY_REQUEST_CAP = env_int("GEMINI_DAILY_REQUEST_CAP", default=200)

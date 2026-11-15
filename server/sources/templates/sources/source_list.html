@@ -1,0 +1,69 @@
+{% extends "sources/base.html" %}
+{% block title %}Sources · BiteSIze{% endblock %}
+{% block content %}
+<h1>Your sources</h1>
+
+{% if grouped_sources %}
+  {% for category, sources in grouped_sources.items %}
+  <section>
+    <h2>{{ category }}</h2>
+    <ul>
+      {% for source in sources %}
+      <li>
+        <strong>{{ source.name }}</strong>
+        {% if not source.active %}<em>(off)</em>{% endif %}
+        <br><small>{{ source.url }}</small>
+        <form method="post" action="{% url 'sources:toggle' source.pk %}">
+          {% csrf_token %}
+          <button type="submit">{% if source.active %}Turn off{% else %}Turn on{% endif %}</button>
+        </form>
+        <form method="post" action="{% url 'sources:delete' source.pk %}">
+          {% csrf_token %}
+          <button type="submit">Remove</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endfor %}
+{% else %}
+  <p>You don't follow any sources yet. Add a feed below or pick from the catalogue.</p>
+{% endif %}
+
+<section>
+  <h2>Add a feed</h2>
+  <form method="post" action="{% url 'sources:add' %}">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    <p>{{ form.url.label_tag }} {{ form.url }} {{ form.url.errors }}</p>
+    <p>{{ form.name.label_tag }} {{ form.name }} {{ form.name.errors }}<br><small>{{ form.name.help_text }}</small></p>
+    <p>{{ form.category.label_tag }} {{ form.category }} {{ form.category.errors }}
+      {% if categories %}<br><small>Your sections: {{ categories|join:", " }}</small>{% endif %}</p>
+    <button type="submit">Check and add</button>
+  </form>
+</section>
+
+<section>
+  <h2>Starter catalogue</h2>
+  {% for category, entries in catalogue %}
+  <h3>{{ category }}</h3>
+  <ul>
+    {% for entry in entries %}
+    <li>
+      {{ entry.name }}
+      {% if entry.added %}
+        <em>(added)</em>
+      {% else %}
+      <form method="post" action="{% url 'sources:pick' %}">
+        {% csrf_token %}
+        <input type="hidden" name="category" value="{{ category }}">
+        <input type="hidden" name="name" value="{{ entry.name }}">
+        <button type="submit">Add</button>
+      </form>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endfor %}
+</section>
+{% endblock %}

@@ -6,7 +6,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     DJANGO_SETTINGS_MODULE=bitesize_server.settings \
-    DJANGO_DB_PATH=/app/data/server.sqlite3
+    DJANGO_DB_PATH=/app/data/server.sqlite3 \
+    DJANGO_EDITIONS_DIR=/app/data/editions
 
 WORKDIR /app
 

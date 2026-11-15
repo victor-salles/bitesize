@@ -7,4 +7,5 @@ urlpatterns = [
     path("healthz", views.healthz, name="healthz"),
     path("admin/", admin.site.urls),
     path("", include("accounts.urls")),
+    path("sources/", include("sources.urls")),
 ]

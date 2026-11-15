@@ -14,19 +14,20 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, Protocol
 
 from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
 
 from ai import AIClient, use_ai_client
 from ai_locale import epub_label, format_digest_timestamp
-from config import console, submit_in_context, use_settings
+from config import console, get_settings, submit_in_context, use_settings
 from epub import generate_epub
 from feed import fetch_article_content, fetch_feed, filter_headline_only
-from gemini import generate_global_cover, generate_section_cover, process_articles
+from gemini import generate_global_cover, generate_section_cover, process_articles, spread_tied_scores
 from magazine_layers import article_rank_sort_key
 from paywall import log_summary, reset_stats
 from settings_store import Settings
+from tags import normalize_tags
 
 
 @dataclass
@@ -36,6 +37,19 @@ class ExtraSection:
     name: str
     articles: list[dict]
     make_cover: Callable[[list[dict]], dict]
+
+
+class ArticleCache(Protocol):
+    """Per-article AI output (summary, score, tags) kept across editions.
+
+    A result is {"skip": True} for an ad the AI dropped, otherwise
+    {"summary", "relevance", "tipo", "temas"}. get() returns None on a miss
+    or when the cached copy is stale.
+    """
+
+    def get(self, art: dict, language: str) -> Optional[dict]: ...
+
+    def put(self, art: dict, language: str, result: dict) -> None: ...
 
 
 @dataclass
@@ -49,6 +63,8 @@ class EditionConfig:
     max_articles_per_feed: Optional[int] = None
     # None routes AI calls by settings.ai_backend.
     ai: Optional[AIClient] = None
+    # None runs AI on every article; the server shares one cache across users.
+    article_cache: Optional[ArticleCache] = None
     extra_sections: list[ExtraSection] = field(default_factory=list)
     now: Optional[datetime] = None
 
@@ -83,6 +99,45 @@ def _log_headline_drops(dropped: list[dict]) -> None:
     )
     for source, count in by_source.most_common():
         console.print(f"  [dim]   · {source}: {count}[/dim]")
+
+
+def _process_articles(articles: list[dict], cache: Optional[ArticleCache]) -> list[dict]:
+    """process_articles(), sending only articles missing from *cache* to the AI."""
+    if cache is None:
+        return process_articles(articles)
+
+    language = get_settings().ai_language
+    hits: list[dict] = []
+    misses: list[dict] = []
+    for art in articles:
+        cached = cache.get(art, language) if art.get("url") else None
+        if cached is None:
+            misses.append(art)
+        elif not cached.get("skip"):
+            hit = {**art, "summary": cached.get("summary", ""), "relevance": cached["relevance"],
+                   "relevance_source": "ai"}
+            hits.append(normalize_tags(hit, cached))
+
+    processed = process_articles(misses) if misses else []
+
+    by_url = {art["url"]: art for art in processed if art.get("url")}
+    for art in misses:
+        if not art.get("url"):
+            continue
+        out = by_url.get(art["url"])
+        if out is None:  # the AI dropped it as an ad
+            cache.put(art, language, {"skip": True})
+        elif out.get("relevance_source") == "ai":  # never cache fallback scores
+            cache.put(art, language, {
+                "summary": out.get("summary", ""),
+                "relevance": out["relevance"],
+                "tipo": out.get("tipo"),
+                "temas": out.get("temas", []),
+            })
+
+    if hits:
+        console.print(f"  [dim]♻  {len(hits)} article(s) from the article cache[/dim]")
+    return spread_tied_scores(hits + processed)
 
 
 def build_edition(config: EditionConfig) -> EditionResult:
@@ -180,7 +235,7 @@ def _build(config: EditionConfig) -> EditionResult:
         flat_articles = [art for arts in raw_sections.values() for art in arts]
 
         with console.status("  Filtering and summarising articles…"):
-            processed_flat = process_articles(flat_articles)
+            processed_flat = _process_articles(flat_articles, config.article_cache)
 
         # ── 3.5 Drop headline-only articles (no readable body or summary) ─────
         kept_flat, dropped_flat = filter_headline_only(processed_flat)
