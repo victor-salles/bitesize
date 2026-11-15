@@ -8,6 +8,7 @@ from django.core.cache import cache
 from django.urls import reverse
 
 from accounts.forms import SignupForm
+from accounts.models import Invite
 from accounts.throttle import client_ip
 
 SIGNUP = {"name": "Ana", "kindle_email": "ana_42@kindle.com", "pin": "4821", "pin_confirm": "4821"}
@@ -28,6 +29,11 @@ def ana(db):
     return user
 
 
+@pytest.fixture
+def signup_url(db):
+    return reverse("signup", args=[Invite.objects.create(note="Ana").token])
+
+
 def login(client, name="Ana", pin="4821", **extra):
     return client.post(reverse("login"), {"name": name, "pin": pin}, **extra)
 
@@ -35,16 +41,16 @@ def login(client, name="Ana", pin="4821", **extra):
 # ── Sign-up ──────────────────────────────────────────────────────────────────
 
 
-def test_signup_page_renders_a_csrf_protected_form(client):
-    response = client.get(reverse("signup"))
+def test_signup_page_renders_a_csrf_protected_form(client, signup_url):
+    response = client.get(signup_url)
 
     assert response.status_code == 200
     assert b"csrfmiddlewaretoken" in response.content
     assert b"<script" not in response.content
 
 
-def test_signup_creates_the_user_with_a_hashed_pin_and_kindle_email(client):
-    response = client.post(reverse("signup"), SIGNUP)
+def test_signup_creates_the_user_with_a_hashed_pin_and_kindle_email(client, signup_url):
+    response = client.post(signup_url, SIGNUP)
 
     assert response.status_code == 302
     assert response["Location"] == reverse("home")
@@ -54,8 +60,8 @@ def test_signup_creates_the_user_with_a_hashed_pin_and_kindle_email(client):
     assert user.profile.kindle_email == "ana_42@kindle.com"
 
 
-def test_signup_logs_the_user_in(client):
-    client.post(reverse("signup"), SIGNUP)
+def test_signup_logs_the_user_in(client, signup_url):
+    client.post(signup_url, SIGNUP)
 
     response = client.get(reverse("home"))
 
@@ -63,8 +69,8 @@ def test_signup_logs_the_user_in(client):
     assert b"Ana" in response.content
 
 
-def test_signup_lowercases_the_kindle_email(client):
-    client.post(reverse("signup"), {**SIGNUP, "kindle_email": "Ana_42@Kindle.COM"})
+def test_signup_lowercases_the_kindle_email(client, signup_url):
+    client.post(signup_url, {**SIGNUP, "kindle_email": "Ana_42@Kindle.COM"})
 
     assert User.objects.get(username="Ana").profile.kindle_email == "ana_42@kindle.com"
 
@@ -133,6 +139,8 @@ def test_pin_must_match_its_confirmation(db):
 def test_login_page_renders_a_csrf_protected_form(client):
     response = client.get(reverse("login"))
 
+    assert b"Forgot your PIN" in response.content
+
     assert response.status_code == 200
     assert b"csrfmiddlewaretoken" in response.content
     assert b'inputmode="numeric"' in response.content
@@ -184,13 +192,13 @@ def test_login_ignores_an_offsite_next_url(client, ana):
     assert response["Location"] == reverse("home")
 
 
-def test_login_and_signup_require_csrf(ana):
+def test_login_and_signup_require_csrf(ana, signup_url):
     from django.test import Client
 
     strict = Client(enforce_csrf_checks=True)
 
     assert strict.post(reverse("login"), {"name": "Ana", "pin": "4821"}).status_code == 403
-    assert strict.post(reverse("signup"), {**SIGNUP, "name": "Bia"}).status_code == 403
+    assert strict.post(signup_url, {**SIGNUP, "name": "Bia"}).status_code == 403
     assert strict.post(reverse("logout")).status_code == 403
 
 
@@ -221,7 +229,7 @@ def test_home_requires_login(client):
     assert response["Location"].startswith(reverse("login"))
 
 
-@pytest.mark.parametrize("page", ["login", "signup"])
+@pytest.mark.parametrize("page", ["login", "signup_closed"])
 def test_authenticated_users_are_sent_home(client, ana, page):
     client.force_login(ana)
 
@@ -291,6 +299,7 @@ def test_account_locks_after_too_many_failures(client, ana, settings):
 
     assert response.status_code == 429
     assert b"Too many failed attempts" in response.content
+    assert b"Forgot your PIN" in response.content
     assert "_auth_user_id" not in client.session
 
 

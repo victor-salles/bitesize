@@ -36,10 +36,15 @@ The SQLite file defaults to `server/db.sqlite3` (gitignored).
 | `DJANGO_LOGIN_FAILURES_PER_ACCOUNT` | `5` | Failed PINs before the account locks |
 | `DJANGO_LOGIN_FAILURES_PER_IP` | `20` | Failed PINs before the client IP locks |
 | `DJANGO_LOGIN_LOCKOUT_MINUTES` | `15` | Lock length, counted from the last failure |
+| `DJANGO_INVITE_DAYS` | `14` | How long a sign-up invite stays valid |
 
 ## Accounts
 
-The `accounts` app handles sign-up (name, Send-to-Kindle address, 4–6 digit PIN), login and logout. The PIN is stored as Django's password hash; trivial PINs (`1234`, `0000`, `9876`) are refused. Names are unique and matched case-insensitively. Pages extend `server/templates/base.html`: plain forms, no JavaScript, large tap targets for the Kindle browser.
+The `accounts` app handles sign-up (name, Send-to-Kindle address, 4–6 digit PIN), login and logout.
+
+Sign-up is invite-only. Staff create single-use links at `/invites/` (or in the admin); a link works at `/signup/<token>/` until it is used, revoked or expired. Every other sign-up URL shows the same "you need an invite" page, without saying why. The invite is spent in the same transaction that creates the user.
+
+There is no self-service PIN reset. Staff reset a PIN in the admin (Users → the user → "Reset password"): for non-staff users it takes a 4–6 digit PIN; staff accounts keep Django's password validators. The PIN is stored as Django's password hash; trivial PINs (`1234`, `0000`, `9876`) are refused. Names are unique and matched case-insensitively. Pages extend `server/templates/base.html`: plain forms, no JavaScript, large tap targets for the Kindle browser.
 
 Failed logins are counted per account and per client IP in Django's cache. The cache is `DatabaseCache` in the SQLite file, not the default in-process `LocMemCache`: gunicorn runs two workers, and per-process counters would let an attacker get double the attempts and lose them on every restart. A database cache needs no extra service on the droplet. Migration `accounts/0001` creates the table, so `migrate` stays the only deploy step. The client IP is the rightmost `X-Forwarded-For` entry, the one Dokku's nginx writes.
 

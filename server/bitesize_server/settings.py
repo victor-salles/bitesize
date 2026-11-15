@@ -125,6 +125,9 @@ LOGIN_FAILURES_PER_ACCOUNT = env_int("DJANGO_LOGIN_FAILURES_PER_ACCOUNT", defaul
 LOGIN_FAILURES_PER_IP = env_int("DJANGO_LOGIN_FAILURES_PER_IP", default=20)
 LOGIN_LOCKOUT_SECONDS = env_int("DJANGO_LOGIN_LOCKOUT_MINUTES", default=15) * 60
 
+# Sign-up needs a single-use invite link from staff (accounts.Invite).
+INVITE_DAYS = env_int("DJANGO_INVITE_DAYS", default=14)
+
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = os.environ.get("DJANGO_TIME_ZONE", "UTC")
 USE_I18N = True

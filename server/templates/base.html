@@ -17,6 +17,8 @@ Pages fill {% block title %} and {% block content %}. #59 restyles this from the
   nav a, nav button { display: inline-block; min-height: 3rem; padding: 0.5rem 1rem; }
   nav form button { width: auto; margin: 0; }
   .helptext { display: block; font-size: 1rem; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border-bottom: 1px solid #000; padding: 0.5rem; text-align: left; vertical-align: top; word-break: break-all; }
   .errorlist { margin: 0.5rem 0; padding: 0.5rem; border: 2px solid #000; list-style: none; font-weight: bold; }
 </style>
 </head>
@@ -26,10 +28,10 @@ Pages fill {% block title %} and {% block content %}. #59 restyles this from the
   <nav aria-label="Account">
     {% if user.is_authenticated %}
       <span>{{ user.username }}</span>
+      {% if user.is_staff %}<a href="{% url 'invites' %}">Invites</a>{% endif %}
       <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">Log out</button></form>
     {% else %}
       <a href="{% url 'login' %}">Log in</a>
-      <a href="{% url 'signup' %}">Sign up</a>
     {% endif %}
   </nav>
 </header>

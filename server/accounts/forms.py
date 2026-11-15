@@ -19,6 +19,13 @@ def _is_trivial(pin: str) -> bool:
     return steps in ({0}, {1}, {-1})
 
 
+def validate_pin(pin: str) -> None:
+    if not PIN_PATTERN.fullmatch(pin):
+        raise forms.ValidationError("The PIN must be 4 to 6 digits.", code="pin_format")
+    if _is_trivial(pin):
+        raise forms.ValidationError("That PIN is too easy to guess.", code="pin_trivial")
+
+
 def pin_input(autocomplete: str) -> forms.PasswordInput:
     return forms.PasswordInput(
         attrs={"inputmode": "numeric", "pattern": "[0-9]*", "maxlength": 6, "autocomplete": autocomplete}
@@ -61,10 +68,7 @@ class SignupForm(forms.Form):
 
     def clean_pin(self) -> str:
         pin = self.cleaned_data["pin"]
-        if not PIN_PATTERN.fullmatch(pin):
-            raise forms.ValidationError("The PIN must be 4 to 6 digits.", code="pin_format")
-        if _is_trivial(pin):
-            raise forms.ValidationError("That PIN is too easy to guess.", code="pin_trivial")
+        validate_pin(pin)
         return pin
 
     def clean(self):
@@ -87,3 +91,7 @@ class LoginForm(forms.Form):
     name = forms.CharField(max_length=150, widget=forms.TextInput(attrs={**NAME_ATTRS, "autofocus": True}))
     pin = forms.CharField(label="PIN", max_length=32, strip=False, widget=pin_input("current-password"))
     next = forms.CharField(required=False, widget=forms.HiddenInput)
+
+
+class InviteForm(forms.Form):
+    note = forms.CharField(label="Who is it for?", max_length=120, required=False)

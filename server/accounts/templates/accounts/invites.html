@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Invites · BiteSIze{% endblock %}
+{% block content %}
+<h1>Invites</h1>
+<form method="post" action="{% url 'invites' %}">
+  {% csrf_token %}
+  {{ form }}
+  <button type="submit">Create invite</button>
+</form>
+
+<h2>Recent invites</h2>
+{% if invites %}
+<table>
+  <thead><tr><th scope="col">For</th><th scope="col">Status</th><th scope="col">Sign-up link</th><th scope="col"></th></tr></thead>
+  <tbody>
+  {% for invite in invites %}
+    <tr>
+      <td>{{ invite.note|default:"—" }}<br><small>created {{ invite.created_at|date:"Y-m-d" }}</small></td>
+      <td>{{ invite.status }}{% if invite.status == "used" and invite.used_by %} by {{ invite.used_by.username }}{% elif invite.status == "pending" %}<br><small>until {{ invite.expires_at|date:"Y-m-d" }}</small>{% endif %}</td>
+      <td>{% if invite.status == "pending" %}<code>{{ invite.link }}</code>{% endif %}</td>
+      <td>{% if invite.status == "pending" %}
+        <form method="post" action="{% url 'revoke_invite' invite.pk %}">{% csrf_token %}<button type="submit">Revoke</button></form>
+      {% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No invites yet.</p>
+{% endif %}
+{% endblock %}
