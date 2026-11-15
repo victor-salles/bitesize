@@ -8,7 +8,7 @@ from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
 
-from .env import env_bool, env_list
+from .env import env_bool, env_int, env_list
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django_tasks_db",
     "core",
+    "articles",
 ]
 
 MIDDLEWARE = [
@@ -123,3 +124,8 @@ LOGGING = {
     "handlers": {"console": {"class": "logging.StreamHandler"}},
     "root": {"handlers": ["console"], "level": os.environ.get("DJANGO_LOG_LEVEL", "INFO")},
 }
+
+# Server AI: Gemini API with the server's key (see server/README.md).
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL") or "gemini-3.5-flash-lite"
+GEMINI_DAILY_REQUEST_CAP = env_int("GEMINI_DAILY_REQUEST_CAP", default=200)

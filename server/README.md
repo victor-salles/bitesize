@@ -32,6 +32,21 @@ The SQLite file defaults to `server/db.sqlite3` (gitignored).
 | `DJANGO_DB_PATH` | `server/db.sqlite3` (`/app/data/server.sqlite3` in the image) | SQLite file path |
 | `DJANGO_TIME_ZONE` | `UTC` | |
 | `DJANGO_LOG_LEVEL` | `INFO` | |
+| `GEMINI_API_KEY` | empty | Server's Gemini API key. Empty means no AI: editions build without summaries. Set it with `dokku config:set`, never in git |
+| `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Any current Gemini model code |
+| `GEMINI_DAILY_REQUEST_CAP` | `200` | Gemini requests per day (server time zone), covers included. Past it, editions build without summaries |
+
+## AI and the article cache
+
+The server calls the Gemini API directly (`articles.gemini.GeminiClient`, an `ai.AIClient`). Summaries, scores, tags and ad skips are cached in `core.Article` per URL and language (`articles.cache.DatabaseArticleCache`), so an article several users follow goes to Gemini once. A cached row is reused while the article's text hash matches. Section and global covers are per user and are not cached.
+
+Build an edition with both:
+
+```python
+EditionConfig(..., ai=GeminiClient.from_settings(), article_cache=DatabaseArticleCache())
+```
+
+Daily request counts are in the admin under *AI usage*.
 
 ## Processes
 

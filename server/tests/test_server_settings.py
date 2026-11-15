@@ -11,6 +11,9 @@ ENV_VARS = [
     "DJANGO_ALLOWED_HOSTS",
     "DJANGO_CSRF_TRUSTED_ORIGINS",
     "DJANGO_DB_PATH",
+    "GEMINI_API_KEY",
+    "GEMINI_MODEL",
+    "GEMINI_DAILY_REQUEST_CAP",
 ]
 
 
@@ -90,3 +93,26 @@ def test_invalid_debug_value_is_rejected(load_settings):
 def test_tasks_use_database_backend(settings):
     assert settings.TASKS["default"]["BACKEND"] == "django_tasks_db.DatabaseBackend"
     assert "django_tasks_db" in settings.INSTALLED_APPS
+
+
+def test_gemini_defaults(load_settings):
+    settings = load_settings(DJANGO_DEBUG="true")
+
+    assert settings.GEMINI_API_KEY == ""
+    assert settings.GEMINI_MODEL == "gemini-3.5-flash-lite"
+    assert settings.GEMINI_DAILY_REQUEST_CAP == 200
+
+
+def test_gemini_from_env(load_settings):
+    settings = load_settings(
+        DJANGO_DEBUG="true", GEMINI_API_KEY="k", GEMINI_MODEL="gemini-x", GEMINI_DAILY_REQUEST_CAP="50"
+    )
+
+    assert (settings.GEMINI_API_KEY, settings.GEMINI_MODEL, settings.GEMINI_DAILY_REQUEST_CAP) == (
+        "k", "gemini-x", 50,
+    )
+
+
+def test_gemini_cap_must_be_an_integer(load_settings):
+    with pytest.raises(ImproperlyConfigured, match="GEMINI_DAILY_REQUEST_CAP"):
+        load_settings(DJANGO_DEBUG="true", GEMINI_DAILY_REQUEST_CAP="lots")
