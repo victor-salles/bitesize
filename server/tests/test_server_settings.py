@@ -14,6 +14,7 @@ ENV_VARS = [
     "GEMINI_API_KEY",
     "GEMINI_MODEL",
     "GEMINI_DAILY_REQUEST_CAP",
+    "DJANGO_HSTS_SECONDS",
 ]
 
 
@@ -116,3 +117,32 @@ def test_gemini_from_env(load_settings):
 def test_gemini_cap_must_be_an_integer(load_settings):
     with pytest.raises(ImproperlyConfigured, match="GEMINI_DAILY_REQUEST_CAP"):
         load_settings(DJANGO_DEBUG="true", GEMINI_DAILY_REQUEST_CAP="lots")
+
+
+def test_production_turns_on_https_and_browser_protections(load_settings):
+    settings = load_settings(DJANGO_SECRET_KEY="s3cr3t")
+
+    assert settings.SECURE_PROXY_SSL_HEADER == ("HTTP_X_FORWARDED_PROTO", "https")
+    assert settings.SECURE_SSL_REDIRECT is True
+    assert settings.SECURE_REDIRECT_EXEMPT == [r"^healthz$"]
+    assert settings.SECURE_HSTS_SECONDS == 24 * 60 * 60
+    assert settings.SECURE_HSTS_INCLUDE_SUBDOMAINS is True
+    assert settings.SECURE_HSTS_PRELOAD is False
+    assert settings.SESSION_COOKIE_SECURE is True
+    assert settings.CSRF_COOKIE_SECURE is True
+    assert settings.X_FRAME_OPTIONS == "DENY"
+    assert settings.SECURE_CONTENT_TYPE_NOSNIFF is True
+    assert settings.SECURE_REFERRER_POLICY == "same-origin"
+
+
+def test_hsts_seconds_from_env(load_settings):
+    settings = load_settings(DJANGO_SECRET_KEY="s3cr3t", DJANGO_HSTS_SECONDS="31536000")
+
+    assert settings.SECURE_HSTS_SECONDS == 31536000
+
+
+def test_debug_serves_plain_http(load_settings):
+    settings = load_settings(DJANGO_DEBUG="true")
+
+    assert settings.SECURE_SSL_REDIRECT is False
+    assert settings.SECURE_HSTS_SECONDS == 0

@@ -45,6 +45,7 @@ python server/manage.py add_starter_sources <username> [--category Tech ...]
 | `DJANGO_LOGIN_FAILURES_PER_IP` | `20` | Failed PINs before the client IP locks |
 | `DJANGO_LOGIN_LOCKOUT_MINUTES` | `15` | Lock length, counted from the last failure |
 | `DJANGO_INVITE_DAYS` | `14` | How long a sign-up invite stays valid |
+| `DJANGO_HSTS_SECONDS` | `86400` (1 day) | HSTS max-age when `DJANGO_DEBUG` is off. Raise it (e.g. `31536000`) once HTTPS has held up |
 | `DJANGO_EDITIONS_DIR` | `server/media/editions` (`/app/data/editions` in the image) | Built EPUBs, under `<user id>/<date>/` |
 | `GEMINI_API_KEY` | empty | Server's Gemini API key. Empty means no AI: editions build without summaries. Set it with `dokku config:set`, never in git |
 | `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Any current Gemini model code |
@@ -104,5 +105,7 @@ git push dokku <branch>:main
 dokku ps:scale bitesize web=1 worker=1
 dokku letsencrypt:enable bitesize
 ```
+
+With `DJANGO_DEBUG` off the app redirects plain HTTP to HTTPS (except `/healthz`, so container health checks can call it directly), sends HSTS, and marks the session and CSRF cookies secure. `python server/manage.py check --deploy` should report only `security.W021` (HSTS preload, deliberately off).
 
 The `/app/data` mount keeps the SQLite file across deploys; without it every deploy starts from an empty database.

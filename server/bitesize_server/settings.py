@@ -160,6 +160,19 @@ STORAGES = {
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
+# Production is HTTPS only. /healthz stays reachable over plain HTTP for
+# container health checks, which call the app directly, not through nginx.
+SECURE_SSL_REDIRECT = not DEBUG
+SECURE_REDIRECT_EXEMPT = [r"^healthz$"]
+# Start HSTS short (1 day) and raise DJANGO_HSTS_SECONDS once HTTPS has held up.
+# Subdomains of the app's own host are covered; preload is a one-way door, so off.
+SECURE_HSTS_SECONDS = 0 if DEBUG else env_int("DJANGO_HSTS_SECONDS", default=24 * 60 * 60)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = False
+# Django's defaults, set here so the security posture is visible in one place.
+X_FRAME_OPTIONS = "DENY"
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
 
 LOGGING = {
     "version": 1,
