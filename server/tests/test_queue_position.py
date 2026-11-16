@@ -3,6 +3,8 @@ from datetime import timezone as dt_timezone
 
 import pytest
 from django.contrib.auth.models import User
+from django.urls import reverse
+from django_tasks_db.models import DBTaskResult
 
 from core.models import Edition
 from editions.services import DEFAULT_RUN_TIME, QueueStatus, queue_status
@@ -163,3 +165,100 @@ def test_today_is_the_users_local_date(ana):
     tomorrow = make_edition("ana", Edition.Status.QUEUED, queued_minutes_ago=1, edition_date=TODAY + timedelta(days=1))
 
     assert queue_status(ana).edition == tomorrow
+
+
+# ── Page ─────────────────────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def client_ana(client, ana):
+    client.force_login(ana)
+    return client
+
+
+@pytest.mark.parametrize(
+    "method, name", [("get", "editions:status"), ("post", "editions:request_today")]
+)
+def test_pages_require_login(client, db, method, name):
+    response = getattr(client, method)(reverse(name))
+
+    assert response.status_code == 302
+    assert response["Location"] == f"{reverse('login')}?next={reverse(name)}"
+    assert not Edition.objects.exists()
+
+
+def test_empty_state_offers_to_request_todays_edition(client_ana):
+    response = client_ana.get(reverse("editions:status"))
+
+    body = response.content.decode()
+    assert response.status_code == 200
+    assert "No edition for today yet." in body
+    assert "You have no editions yet." in body
+    assert f'action="{reverse("editions:request_today")}"' in body
+    assert "<script" not in body
+
+
+def test_page_shows_position_estimate_and_busy_warning(client_ana):
+    built("old", 10, days_ago=1)
+    make_edition("bia", Edition.Status.RUNNING, queued_minutes_ago=30, started_at=NOW - 4 * MINUTE)
+    make_edition("caio", Edition.Status.QUEUED, queued_minutes_ago=20)
+    make_edition("ana", Edition.Status.QUEUED, queued_minutes_ago=5)
+
+    response = client_ana.get(reverse("editions:status"))
+
+    body = response.content.decode()
+    assert "Status: Queued" in body
+    assert "2 editions ahead of yours." in body
+    assert "Estimated wait: about 26 minutes." in body
+    assert "Longer than usual: the queue is busy." in body
+    assert f'action="{reverse("editions:request_today")}"' not in body
+
+
+def test_page_says_the_estimate_is_a_guess_without_history(client_ana):
+    make_edition("ana", Edition.Status.QUEUED, queued_minutes_ago=1)
+
+    body = client_ana.get(reverse("editions:status")).content.decode()
+
+    assert "You're next." in body
+    assert "Estimated wait: about 10 minutes." in body
+    assert "No edition has been built yet, so this estimate is a guess." in body
+    assert "Longer than usual" not in body
+
+
+def test_page_lists_only_my_recent_editions(client_ana):
+    built("ana", 5, days_ago=2)
+    make_edition("ana", Edition.Status.FAILED, queued_minutes_ago=60 * 24, edition_date=date(2026, 11, 14))
+    make_edition("bia", Edition.Status.SUCCEEDED, queued_minutes_ago=60, edition_date=date(2026, 11, 10))
+
+    response = client_ana.get(reverse("editions:status"))
+
+    assert [(e.edition_date, e.status) for e in response.context["recent_editions"]] == [
+        (date(2026, 11, 14), Edition.Status.FAILED),
+        (date(2026, 11, 13), Edition.Status.SUCCEEDED),
+    ]
+    assert "Nov. 10, 2026" not in response.content.decode()
+
+
+def test_failed_edition_today_can_be_requested_again(client_ana):
+    make_edition("ana", Edition.Status.FAILED, queued_minutes_ago=30)
+
+    body = client_ana.get(reverse("editions:status")).content.decode()
+
+    assert "Status: Failed" in body
+    assert f'action="{reverse("editions:request_today")}"' in body
+
+
+def test_request_queues_todays_edition_once(client_ana, ana):
+    first = client_ana.post(reverse("editions:request_today"))
+    second = client_ana.post(reverse("editions:request_today"))
+
+    assert first.status_code == second.status_code == 302
+    assert first["Location"] == reverse("editions:status")
+    assert list(Edition.objects.values_list("user", "edition_date", "status")) == [
+        (ana.pk, TODAY, Edition.Status.QUEUED)
+    ]
+    assert DBTaskResult.objects.count() == 1
+
+
+def test_request_rejects_get(client_ana):
+    assert client_ana.get(reverse("editions:request_today")).status_code == 405

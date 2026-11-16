@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Editions · BiteSIze{% endblock %}
+{% block content %}
+<h1>Today's edition</h1>
+<p>Editions go to <strong>{{ user.profile.kindle_email|default:"no Kindle address yet" }}</strong>.</p>
+
+{% with edition=queue.edition %}
+{% if edition %}
+  <p>Status: {{ edition.get_status_display }}</p>
+  {% if queue.ahead is not None %}
+    <p>{% if queue.ahead %}{{ queue.ahead }} edition{{ queue.ahead|pluralize }} ahead of yours.{% else %}You're next.{% endif %}</p>
+    <p>Estimated wait: about {{ wait_minutes }} minute{{ wait_minutes|pluralize }}.</p>
+    {% if not queue.from_history %}<p>No edition has been built yet, so this estimate is a guess.</p>{% endif %}
+    {% if queue.longer_than_usual %}<p><strong>Longer than usual: the queue is busy.</strong></p>{% endif %}
+  {% endif %}
+  {% if edition.error %}<p>{{ edition.error }}</p>{% endif %}
+{% else %}
+  <p>No edition for today yet.</p>
+{% endif %}
+{% endwith %}
+
+{% if can_request %}
+<form method="post" action="{% url 'editions:request_today' %}">
+  {% csrf_token %}
+  <button type="submit">Request today's edition</button>
+</form>
+{% endif %}
+
+<h2>Your editions</h2>
+{% if recent_editions %}
+<table>
+  <thead><tr><th>Date</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for edition in recent_editions %}
+    <tr><td>{{ edition.edition_date }}</td><td>{{ edition.get_status_display }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>You have no editions yet.</p>
+{% endif %}
+{% endblock %}
