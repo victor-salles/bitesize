@@ -181,12 +181,29 @@ X_FRAME_OPTIONS = "DENY"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 
+# Everything, including django.request 500s with tracebacks, goes to stdout,
+# where `dokku logs` reads it: JSON lines in production, plain text in debug.
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "formatters": {
+        "json": {"()": "bitesize_server.log_format.JsonFormatter"},
+        "text": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"},
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "stream": "ext://sys.stdout",
+            "formatter": "text" if DEBUG else "json",
+        }
+    },
     "root": {"handlers": ["console"], "level": os.environ.get("DJANGO_LOG_LEVEL", "INFO")},
 }
+
+# Who gets error emails (Django's mail_admins handler). Nothing is sent until
+# ADMINS is set and an email backend is configured.
+ADMINS = env_list("DJANGO_ADMINS")
+SERVER_EMAIL = os.environ.get("DJANGO_SERVER_EMAIL") or "root@localhost"
 
 # Server AI: Gemini API with the server's key (see server/README.md).
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")

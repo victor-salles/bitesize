@@ -39,7 +39,9 @@ python server/manage.py add_starter_sources <username> [--category Tech ...]
 | `DJANGO_CSRF_TRUSTED_ORIGINS` | empty | Comma-separated, with scheme: `https://bitesize.example.com` |
 | `DJANGO_DB_PATH` | `server/db.sqlite3` (`/app/data/server.sqlite3` in the image) | SQLite file path |
 | `DJANGO_TIME_ZONE` | `UTC` | |
-| `DJANGO_LOG_LEVEL` | `INFO` | |
+| `DJANGO_LOG_LEVEL` | `INFO` | Logs go to stdout: one JSON object per line in production, plain text in debug |
+| `DJANGO_ADMINS` | empty | Comma-separated emails for Django's error emails. Nothing is sent until an email backend is configured |
+| `DJANGO_SERVER_EMAIL` | `root@localhost` | Sender of those error emails |
 | `DJANGO_SESSION_DAYS` | `365` | How long a login lasts |
 | `DJANGO_LOGIN_FAILURES_PER_ACCOUNT` | `5` | Failed PINs before the account locks |
 | `DJANGO_LOGIN_FAILURES_PER_IP` | `20` | Failed PINs before the client IP locks |
