@@ -1,10 +1,12 @@
+import json
 from datetime import UTC, date, datetime, time, timedelta
 from io import StringIO
+from pathlib import Path
 from unittest import mock
 
 import pytest
 from django.contrib.auth.models import User
-from django.core.management import call_command
+from django.core.management import call_command, load_command_class
 from django_tasks_db.models import DBTaskResult
 
 from core.models import Edition, Source
@@ -170,3 +172,16 @@ def test_command_uses_the_current_time_and_reports_the_count(three_readers):
         ("bia", date(2026, 11, 15)),
         ("kei", date(2026, 11, 15)),
     ]
+
+
+def test_dokku_cron_runs_the_schedule_command():
+    app_json = json.loads((Path(__file__).resolve().parents[2] / "app.json").read_text())
+
+    assert app_json["cron"] == [
+        {
+            "command": "python server/manage.py enqueue_due_editions",
+            "schedule": "*/10 * * * *",
+            "concurrency_policy": "forbid",
+        }
+    ]
+    assert load_command_class("editions", "enqueue_due_editions")
