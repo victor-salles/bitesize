@@ -15,6 +15,7 @@ ENV_VARS = [
     "GEMINI_MODEL",
     "GEMINI_DAILY_REQUEST_CAP",
     "DJANGO_HSTS_SECONDS",
+    "DJANGO_ADMIN_PATH",
 ]
 
 
@@ -146,3 +147,19 @@ def test_debug_serves_plain_http(load_settings):
 
     assert settings.SECURE_SSL_REDIRECT is False
     assert settings.SECURE_HSTS_SECONDS == 0
+
+
+def test_admin_path_defaults_to_admin(load_settings):
+    assert load_settings(DJANGO_DEBUG="true").ADMIN_URL == "admin/"
+
+
+@pytest.mark.parametrize("raw", ["back-office-7f3a", "/back-office-7f3a/", " back-office-7f3a/ "])
+def test_admin_path_from_env_is_normalised(load_settings, raw):
+    assert load_settings(DJANGO_DEBUG="true", DJANGO_ADMIN_PATH=raw).ADMIN_URL == "back-office-7f3a/"
+
+
+def test_admin_path_cannot_be_the_site_root(load_settings):
+    with pytest.raises(ImproperlyConfigured) as excinfo:
+        load_settings(DJANGO_DEBUG="true", DJANGO_ADMIN_PATH="/")
+
+    assert str(excinfo.value) == "DJANGO_ADMIN_PATH must name a path, got '/'"

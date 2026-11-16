@@ -45,6 +45,7 @@ python server/manage.py add_starter_sources <username> [--category Tech ...]
 | `DJANGO_LOGIN_FAILURES_PER_IP` | `20` | Failed PINs before the client IP locks |
 | `DJANGO_LOGIN_LOCKOUT_MINUTES` | `15` | Lock length, counted from the last failure |
 | `DJANGO_INVITE_DAYS` | `14` | How long a sign-up invite stays valid |
+| `DJANGO_ADMIN_PATH` | `admin` | URL path of the Django admin (staff only). Set a non-obvious path in production |
 | `DJANGO_HSTS_SECONDS` | `86400` (1 day) | HSTS max-age when `DJANGO_DEBUG` is off. Raise it (e.g. `31536000`) once HTTPS has held up |
 | `DJANGO_EDITIONS_DIR` | `server/media/editions` (`/app/data/editions` in the image) | Built EPUBs, under `<user id>/<date>/` |
 | `GEMINI_API_KEY` | empty | Server's Gemini API key. Empty means no AI: editions build without summaries. Set it with `dokku config:set`, never in git |

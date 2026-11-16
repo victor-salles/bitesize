@@ -62,6 +62,13 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "bitesize_server.urls"
 
+# The admin lives at a path from the environment so it is not where scanners
+# look first. Unset keeps `admin/`.
+_admin_path = os.environ.get("DJANGO_ADMIN_PATH", "admin").strip().strip("/")
+if not _admin_path:
+    raise ImproperlyConfigured(f"DJANGO_ADMIN_PATH must name a path, got {os.environ['DJANGO_ADMIN_PATH']!r}")
+ADMIN_URL = f"{_admin_path}/"
+
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
