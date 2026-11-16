@@ -82,7 +82,7 @@ def login_view(request):
 @require_safe
 @login_required
 def home(request):
-    return render(request, "accounts/home.html")
+    return redirect("editions:status")
 
 
 def _staff_only(request):

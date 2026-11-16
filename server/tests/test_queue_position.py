@@ -187,6 +187,13 @@ def test_pages_require_login(client, db, method, name):
     assert not Edition.objects.exists()
 
 
+def test_home_sends_logged_in_users_to_their_editions(client_ana):
+    response = client_ana.get(reverse("home"))
+
+    assert response.status_code == 302
+    assert response["Location"] == reverse("editions:status")
+
+
 def test_empty_state_offers_to_request_todays_edition(client_ana):
     response = client_ana.get(reverse("editions:status"))
 
