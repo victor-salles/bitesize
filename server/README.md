@@ -86,6 +86,8 @@ One at a time is how the server fits the 1 GB droplet:
 - If a second worker runs anyway, a task that finds another edition `running` puts itself back in the queue for a minute later instead of building in parallel.
 - An edition `running` for more than `EDITION_STALE_AFTER` (2 hours) lost its worker (crash or deploy); the next task marks it failed so it can be retried.
 
+`/editions/` (where `/` sends logged-in users) shows today's edition, how many queued or running editions are ahead of it, and an estimated wait from the median run time of the last 20 succeeded editions (10 minutes when none has been built yet). It warns when the wait is over twice that median, and a button queues today's edition through `enqueue_edition`.
+
 After an edition is built, the worker sends the `editions.signals.edition_built` signal. Delivery connects there.
 
 ## Deploy (Dokku)
