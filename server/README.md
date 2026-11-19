@@ -76,6 +76,8 @@ Daily request counts are in the admin under *AI usage*.
 - `web`: gunicorn on port 8000, static files served by WhiteNoise.
 - `worker`: `db_worker` from `django-tasks-db`, which runs tasks queued through Django's tasks framework. Run exactly one.
 
+Scheduled tasks are not processes: see [Daily schedule](#daily-schedule).
+
 ## Edition queue
 
 `editions.services.enqueue_edition(user, date)` creates the user's edition for that date (or re-queues it if it failed) and enqueues `editions.tasks.build_user_edition`. The worker builds editions one at a time, oldest `queued_at` first, and records the counts, EPUB path or error on the edition. Failed editions can be retried from the admin (Editions → "Retry selected failed editions"); a retry goes to the back of the queue.
@@ -87,6 +89,14 @@ One at a time is how the server fits the 1 GB droplet:
 - An edition `running` for more than `EDITION_STALE_AFTER` (2 hours) lost its worker (crash or deploy); the next task marks it failed so it can be retried.
 
 After an edition is built, the worker sends the `editions.signals.edition_built` signal. Delivery connects there.
+
+## Daily schedule
+
+`python server/manage.py enqueue_due_editions` queues today's edition for every active reader whose delivery time (`Profile.delivery_time`, in `Profile.timezone`) has passed and who has no edition for their local date yet. Running it again the same day queues nothing more. Readers without a Kindle address or without active sources are skipped, with an `INFO` log line saying why. An edition that already exists for the day, failed ones included, counts as done: retry failures from the admin.
+
+Dokku runs it every ten minutes from the `cron` entry in the repo-root `app.json` (`dokku cron:list bitesize` shows it). Cron uses the server's clock (UTC); each reader's time zone is applied by the command. An edition is queued up to ten minutes after the delivery time, plus its wait in the queue and its build time. A delivery time after 23:50 local is never reached, because the next run already falls on the next local day.
+
+`app.json` also declares a startup healthcheck on `/healthz` (port 8000): Dokku sends traffic to a new deploy only once it answers 200.
 
 ## Deploy (Dokku)
 

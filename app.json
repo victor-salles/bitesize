@@ -1,0 +1,22 @@
+{
+  "cron": [
+    {
+      "command": "python server/manage.py enqueue_due_editions",
+      "schedule": "*/10 * * * *",
+      "concurrency_policy": "forbid"
+    }
+  ],
+  "healthchecks": {
+    "web": [
+      {
+        "type": "startup",
+        "name": "healthz",
+        "path": "/healthz",
+        "port": 8000,
+        "attempts": 5,
+        "wait": 3,
+        "timeout": 5
+      }
+    ]
+  }
+}
