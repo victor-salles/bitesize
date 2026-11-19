@@ -7,12 +7,15 @@ of building two editions at once on the 1 GB droplet.
 """
 
 import logging
+import statistics
+from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from core.models import Edition, Source
@@ -26,6 +29,29 @@ BUSY_RETRY_DELAY = timedelta(seconds=60)
 
 SKIPPED = "skipped"
 DEFERRED = "deferred"
+
+
+# Run time assumed for an edition when none has been built yet.
+DEFAULT_RUN_TIME = timedelta(minutes=10)
+# How many recent succeeded builds the typical run time comes from.
+RUN_TIME_SAMPLE = 20
+# A wait above this many typical builds is "longer than usual".
+LONGER_THAN_USUAL = 2
+
+
+@dataclass(frozen=True)
+class QueueStatus:
+    """Where a user's edition for today stands in the queue."""
+
+    edition: Edition | None
+    # Queued or running editions that will build before it; None unless it is queued or running.
+    ahead: int | None
+    # Until it is built; None unless it is queued or running.
+    estimated_wait: timedelta | None
+    typical_run_time: timedelta
+    # False when typical_run_time is DEFAULT_RUN_TIME because nothing has been built yet.
+    from_history: bool
+    longer_than_usual: bool
 
 
 class EditionError(Exception):
@@ -45,6 +71,59 @@ def enqueue_edition(user, edition_date: date) -> Edition:
         elif edition.status == Edition.Status.FAILED:
             _requeue(edition)
     return edition
+
+
+def local_today(user) -> date:
+    return timezone.localdate(timezone=ZoneInfo(user.profile.timezone))
+
+
+def queue_status(user) -> QueueStatus:
+    """Today's edition for `user`, how many editions build before it and how long until it is built."""
+    edition = Edition.objects.filter(user=user, edition_date=local_today(user)).first()
+    typical, from_history = typical_run_time()
+    ahead = wait = None
+    if edition and edition.status in (Edition.Status.QUEUED, Edition.Status.RUNNING):
+        before = list(_editions_before(edition))
+        ahead = len(before)
+        wait = sum((_time_left(other, typical) for other in [*before, edition]), timedelta(0))
+    return QueueStatus(
+        edition=edition,
+        ahead=ahead,
+        estimated_wait=wait,
+        typical_run_time=typical,
+        from_history=from_history,
+        longer_than_usual=wait is not None and wait > LONGER_THAN_USUAL * typical,
+    )
+
+
+def typical_run_time() -> tuple[timedelta, bool]:
+    """Median run time of recent succeeded editions, and whether there were any."""
+    recent = (
+        Edition.objects.filter(status=Edition.Status.SUCCEEDED, started_at__isnull=False, finished_at__isnull=False)
+        .order_by("-finished_at")
+        .only("started_at", "finished_at")[:RUN_TIME_SAMPLE]
+    )
+    run_times = [edition.run_time for edition in recent]
+    if not run_times:
+        return DEFAULT_RUN_TIME, False
+    return statistics.median(run_times), True
+
+
+def _editions_before(edition: Edition):
+    """Editions the worker builds before `edition`: the running one, then the queue in queued_at order."""
+    if edition.status == Edition.Status.RUNNING:
+        return Edition.objects.none()
+    return Edition.objects.filter(
+        Q(status=Edition.Status.RUNNING)
+        | Q(status=Edition.Status.QUEUED, queued_at__lt=edition.queued_at)
+        | Q(status=Edition.Status.QUEUED, queued_at=edition.queued_at, pk__lt=edition.pk)
+    ).only("status", "started_at")
+
+
+def _time_left(edition: Edition, typical: timedelta) -> timedelta:
+    if edition.status == Edition.Status.RUNNING and edition.started_at:
+        return max(typical - (timezone.now() - edition.started_at), timedelta(0))
+    return typical
 
 
 def retry_edition(edition: Edition) -> bool:

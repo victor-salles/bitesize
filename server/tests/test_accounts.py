@@ -63,7 +63,7 @@ def test_signup_creates_the_user_with_a_hashed_pin_and_kindle_email(client, sign
 def test_signup_logs_the_user_in(client, signup_url):
     client.post(signup_url, SIGNUP)
 
-    response = client.get(reverse("home"))
+    response = client.get(reverse("home"), follow=True)
 
     assert response.status_code == 200
     assert b"Ana" in response.content
@@ -242,7 +242,7 @@ def test_authenticated_users_are_sent_home(client, ana, page):
 def test_home_shows_the_kindle_email_and_a_logout_form(client, ana):
     client.force_login(ana)
 
-    response = client.get(reverse("home"))
+    response = client.get(reverse("home"), follow=True)
 
     assert b"ana_42@kindle.com" in response.content
     assert f'action="{reverse("logout")}"'.encode() in response.content
