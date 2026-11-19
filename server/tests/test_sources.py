@@ -1,4 +1,6 @@
+import ipaddress
 import json
+import socket
 from io import StringIO
 
 import pytest
@@ -25,9 +27,14 @@ HTML = b"<!doctype html><html><head><title>Not a feed</title></head><body><p>Hel
 
 
 class FakeResponse:
-    def __init__(self, body: bytes, status: int = 200):
+    def __init__(self, body: bytes, status: int = 200, location: str | None = None):
         self.body = body
         self.status_code = status
+        self.headers = {"Location": location} if location else {}
+
+    @property
+    def is_redirect(self):
+        return "Location" in self.headers and self.status_code in (301, 302, 303, 307, 308)
 
     def raise_for_status(self):
         if self.status_code >= 400:
@@ -41,19 +48,42 @@ class FakeResponse:
         pass
 
 
+PUBLIC_IP = "93.184.215.14"
+
+
 @pytest.fixture
 def network(monkeypatch):
-    """Serve fake bytes for any URL; record the calls. Never touches the network."""
+    """Serve fake bytes for any URL and resolve every host to a public IP; record
+    the calls. Never touches the network or DNS.
+
+    `state["addresses"]` maps a host to the IPs it resolves to; `state["redirects"]`
+    maps a URL to the Location it redirects to.
+    """
     calls = []
-    state = {"body": RSS, "status": 200, "error": None}
+    state = {"body": RSS, "status": 200, "error": None, "addresses": {}, "redirects": {}}
 
     def fake_get(url, **kwargs):
         calls.append((url, kwargs))
         if state["error"]:
             raise state["error"]
+        if url in state["redirects"]:
+            return FakeResponse(b"", 302, location=state["redirects"][url])
         return FakeResponse(state["body"], state["status"])
 
+    def fake_getaddrinfo(host, port, *args, **kwargs):
+        if host not in state["addresses"] and host.startswith("unknown."):
+            raise socket.gaierror(socket.EAI_NONAME, "Name or service not known")
+        try:
+            addresses = [str(ipaddress.ip_address(host))]  # a literal resolves to itself
+        except ValueError:
+            addresses = state["addresses"].get(host, [PUBLIC_IP])
+        return [
+            (socket.AF_INET6 if ":" in ip else socket.AF_INET, socket.SOCK_STREAM, 6, "", (ip, port))
+            for ip in addresses
+        ]
+
     monkeypatch.setattr(feeds.requests, "get", fake_get)
+    monkeypatch.setattr(feeds.socket, "getaddrinfo", fake_getaddrinfo)
     state["calls"] = calls
     return state
 
@@ -138,6 +168,161 @@ def test_validate_feed_rejects_oversized_responses(network, monkeypatch):
 
     with pytest.raises(feeds.FeedError, match="too large"):
         feeds.validate_feed("https://example.com/feed")
+
+
+# ── Private addresses (SSRF) ─────────────────────────────────────────────────
+
+PRIVATE_NETWORK = "That address points to a private network, which a feed cannot use."
+
+
+@pytest.mark.parametrize(
+    "ip",
+    [
+        "127.0.0.1",  # loopback
+        "10.0.0.5",  # private
+        "172.17.0.2",  # private (Docker / Dokku network)
+        "192.168.1.10",  # private
+        "169.254.169.254",  # link-local (cloud metadata)
+        "100.64.0.1",  # carrier-grade NAT
+        "0.0.0.0",  # unspecified
+        "224.0.0.1",  # multicast
+        "240.0.0.1",  # reserved
+        "::1",  # IPv6 loopback
+        "fe80::1",  # IPv6 link-local
+        "fc00::1",  # IPv6 unique local
+        "ff02::1",  # IPv6 multicast
+        "::ffff:127.0.0.1",  # IPv4-mapped loopback
+        "::ffff:10.0.0.1",  # IPv4-mapped private
+    ],
+)
+def test_validate_feed_refuses_hosts_that_resolve_to_non_public_ips(network, ip):
+    network["addresses"]["internal.example"] = [ip]
+
+    with pytest.raises(feeds.FeedError) as excinfo:
+        feeds.validate_feed("https://internal.example/feed")
+
+    assert str(excinfo.value) == PRIVATE_NETWORK
+    assert network["calls"] == []
+
+
+def test_validate_feed_refuses_a_host_with_any_private_ip(network):
+    network["addresses"]["mixed.example"] = [PUBLIC_IP, "10.0.0.1"]
+
+    with pytest.raises(feeds.FeedError) as excinfo:
+        feeds.validate_feed("https://mixed.example/feed")
+
+    assert str(excinfo.value) == PRIVATE_NETWORK
+    assert network["calls"] == []
+
+
+@pytest.mark.parametrize("url", ["http://127.0.0.1/feed", "http://[::1]/feed", "http://localhost/feed"])
+def test_validate_feed_refuses_literal_and_local_hosts(network, url):
+    network["addresses"]["localhost"] = ["127.0.0.1"]
+
+    with pytest.raises(feeds.FeedError) as excinfo:
+        feeds.validate_feed(url)
+
+    assert str(excinfo.value) == PRIVATE_NETWORK
+    assert network["calls"] == []
+
+
+def test_validate_feed_allows_public_ipv6(network):
+    network["addresses"]["v6.example"] = ["2606:2800:21f:cb07:6820:80da:af6b:8b2c"]
+
+    assert feeds.validate_feed("https://v6.example/feed") == "Example News"
+
+
+@pytest.mark.parametrize("url", ["https://example.com:443/feed", "http://example.com:80/feed"])
+def test_validate_feed_allows_the_standard_ports(network, url):
+    assert feeds.validate_feed(url) == "Example News"
+
+
+@pytest.mark.parametrize("url", ["https://example.com:8443/feed", "http://example.com:22/feed"])
+def test_validate_feed_refuses_other_ports(network, url):
+    with pytest.raises(feeds.FeedError) as excinfo:
+        feeds.validate_feed(url)
+
+    assert str(excinfo.value) == "A feed must use the standard web ports (80 or 443)."
+    assert network["calls"] == []
+
+
+@pytest.mark.parametrize("url", ["ftp://example.com/feed", "file:///etc/passwd", "gopher://example.com/"])
+def test_validate_feed_refuses_other_schemes(network, url):
+    with pytest.raises(feeds.FeedError) as excinfo:
+        feeds.validate_feed(url)
+
+    assert str(excinfo.value) == "A feed address must start with http:// or https://."
+    assert network["calls"] == []
+
+
+def test_validate_feed_reports_unknown_hosts(network):
+    with pytest.raises(feeds.FeedError) as excinfo:
+        feeds.validate_feed("https://unknown.example/feed")
+
+    assert str(excinfo.value) == "Could not find that address."
+    assert network["calls"] == []
+
+
+def test_validate_feed_does_not_let_requests_follow_redirects(network):
+    feeds.validate_feed("https://example.com/feed")
+
+    (_url, kwargs) = network["calls"][0]
+    assert kwargs["allow_redirects"] is False
+
+
+def test_validate_feed_follows_redirects_to_public_hosts(network):
+    network["redirects"]["https://example.com/feed"] = "/rss"
+    network["redirects"]["https://example.com/rss"] = "https://cdn.example/rss.xml"
+
+    assert feeds.validate_feed("https://example.com/feed") == "Example News"
+    assert [url for url, _kwargs in network["calls"]] == [
+        "https://example.com/feed",
+        "https://example.com/rss",
+        "https://cdn.example/rss.xml",
+    ]
+
+
+def test_validate_feed_refuses_a_redirect_to_a_private_ip(network):
+    network["addresses"]["metadata.internal"] = ["169.254.169.254"]
+    network["redirects"]["https://example.com/feed"] = "http://metadata.internal/latest/"
+
+    with pytest.raises(feeds.FeedError) as excinfo:
+        feeds.validate_feed("https://example.com/feed")
+
+    assert str(excinfo.value) == PRIVATE_NETWORK
+    assert [url for url, _kwargs in network["calls"]] == ["https://example.com/feed"]
+
+
+def test_validate_feed_refuses_a_redirect_to_another_scheme(network):
+    network["redirects"]["https://example.com/feed"] = "file:///etc/passwd"
+
+    with pytest.raises(feeds.FeedError) as excinfo:
+        feeds.validate_feed("https://example.com/feed")
+
+    assert str(excinfo.value) == "A feed address must start with http:// or https://."
+
+
+def test_validate_feed_stops_after_too_many_redirects(network):
+    network["redirects"]["https://example.com/a"] = "https://example.com/b"
+    network["redirects"]["https://example.com/b"] = "https://example.com/a"
+
+    with pytest.raises(feeds.FeedError) as excinfo:
+        feeds.validate_feed("https://example.com/a")
+
+    assert str(excinfo.value) == "That address redirected too many times."
+    assert len(network["calls"]) == feeds.MAX_REDIRECTS + 1
+
+
+def test_add_refuses_a_private_address(client_ana, ana, network):
+    network["addresses"]["router.example"] = ["192.168.0.1"]
+
+    response = client_ana.post(
+        reverse("sources:add"), {"url": "http://router.example/feed", "name": "X", "category": "Tech"}
+    )
+
+    assert response.status_code == 200
+    assert response.context["form"].errors["url"] == [PRIVATE_NETWORK]
+    assert not Source.objects.filter(user=ana).exists()
 
 
 # ── Catalogue ────────────────────────────────────────────────────────────────

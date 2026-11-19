@@ -14,6 +14,10 @@ ENV_VARS = [
     "GEMINI_API_KEY",
     "GEMINI_MODEL",
     "GEMINI_DAILY_REQUEST_CAP",
+    "DJANGO_HSTS_SECONDS",
+    "DJANGO_ADMIN_PATH",
+    "DJANGO_ADMINS",
+    "DJANGO_SERVER_EMAIL",
 ]
 
 
@@ -116,3 +120,81 @@ def test_gemini_from_env(load_settings):
 def test_gemini_cap_must_be_an_integer(load_settings):
     with pytest.raises(ImproperlyConfigured, match="GEMINI_DAILY_REQUEST_CAP"):
         load_settings(DJANGO_DEBUG="true", GEMINI_DAILY_REQUEST_CAP="lots")
+
+
+def test_production_turns_on_https_and_browser_protections(load_settings):
+    settings = load_settings(DJANGO_SECRET_KEY="s3cr3t")
+
+    assert settings.SECURE_PROXY_SSL_HEADER == ("HTTP_X_FORWARDED_PROTO", "https")
+    assert settings.SECURE_SSL_REDIRECT is True
+    assert settings.SECURE_REDIRECT_EXEMPT == [r"^healthz$"]
+    assert settings.SECURE_HSTS_SECONDS == 24 * 60 * 60
+    assert settings.SECURE_HSTS_INCLUDE_SUBDOMAINS is True
+    assert settings.SECURE_HSTS_PRELOAD is False
+    assert settings.SESSION_COOKIE_SECURE is True
+    assert settings.CSRF_COOKIE_SECURE is True
+    assert settings.X_FRAME_OPTIONS == "DENY"
+    assert settings.SECURE_CONTENT_TYPE_NOSNIFF is True
+    assert settings.SECURE_REFERRER_POLICY == "same-origin"
+
+
+def test_hsts_seconds_from_env(load_settings):
+    settings = load_settings(DJANGO_SECRET_KEY="s3cr3t", DJANGO_HSTS_SECONDS="31536000")
+
+    assert settings.SECURE_HSTS_SECONDS == 31536000
+
+
+def test_debug_serves_plain_http(load_settings):
+    settings = load_settings(DJANGO_DEBUG="true")
+
+    assert settings.SECURE_SSL_REDIRECT is False
+    assert settings.SECURE_HSTS_SECONDS == 0
+
+
+def test_admin_path_defaults_to_admin(load_settings):
+    assert load_settings(DJANGO_DEBUG="true").ADMIN_URL == "admin/"
+
+
+@pytest.mark.parametrize("raw", ["back-office-7f3a", "/back-office-7f3a/", " back-office-7f3a/ "])
+def test_admin_path_from_env_is_normalised(load_settings, raw):
+    assert load_settings(DJANGO_DEBUG="true", DJANGO_ADMIN_PATH=raw).ADMIN_URL == "back-office-7f3a/"
+
+
+def test_admin_path_cannot_be_the_site_root(load_settings):
+    with pytest.raises(ImproperlyConfigured) as excinfo:
+        load_settings(DJANGO_DEBUG="true", DJANGO_ADMIN_PATH="/")
+
+    assert str(excinfo.value) == "DJANGO_ADMIN_PATH must name a path, got '/'"
+
+
+def test_production_logs_json_to_stdout(load_settings):
+    settings = load_settings(DJANGO_SECRET_KEY="s3cr3t")
+
+    console = settings.LOGGING["handlers"]["console"]
+    assert console == {"class": "logging.StreamHandler", "stream": "ext://sys.stdout", "formatter": "json"}
+    assert settings.LOGGING["formatters"]["json"] == {"()": "bitesize_server.log_format.JsonFormatter"}
+    assert settings.LOGGING["root"] == {"handlers": ["console"], "level": "INFO"}
+
+
+def test_debug_logs_plain_text(load_settings):
+    settings = load_settings(DJANGO_DEBUG="true")
+
+    assert settings.LOGGING["handlers"]["console"]["formatter"] == "text"
+
+
+def test_admins_default_to_nobody(load_settings):
+    settings = load_settings(DJANGO_SECRET_KEY="s3cr3t")
+
+    assert settings.ADMINS == []
+    assert settings.SERVER_EMAIL == "root@localhost"
+
+
+def test_admins_and_sender_from_env(load_settings):
+    settings = load_settings(
+        DJANGO_SECRET_KEY="s3cr3t",
+        DJANGO_ADMINS="victor@example.com, ops@example.com",
+        DJANGO_SERVER_EMAIL="bitesize@example.com",
+    )
+
+    assert settings.ADMINS == ["victor@example.com", "ops@example.com"]
+    assert settings.SERVER_EMAIL == "bitesize@example.com"

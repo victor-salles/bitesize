@@ -62,6 +62,13 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "bitesize_server.urls"
 
+# The admin lives at a path from the environment so it is not where scanners
+# look first. Unset keeps `admin/`.
+_admin_path = os.environ.get("DJANGO_ADMIN_PATH", "admin").strip().strip("/")
+if not _admin_path:
+    raise ImproperlyConfigured(f"DJANGO_ADMIN_PATH must name a path, got {os.environ['DJANGO_ADMIN_PATH']!r}")
+ADMIN_URL = f"{_admin_path}/"
+
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -160,13 +167,43 @@ STORAGES = {
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
+# Production is HTTPS only. /healthz stays reachable over plain HTTP for
+# container health checks, which call the app directly, not through nginx.
+SECURE_SSL_REDIRECT = not DEBUG
+SECURE_REDIRECT_EXEMPT = [r"^healthz$"]
+# Start HSTS short (1 day) and raise DJANGO_HSTS_SECONDS once HTTPS has held up.
+# Subdomains of the app's own host are covered; preload is a one-way door, so off.
+SECURE_HSTS_SECONDS = 0 if DEBUG else env_int("DJANGO_HSTS_SECONDS", default=24 * 60 * 60)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = False
+# Django's defaults, set here so the security posture is visible in one place.
+X_FRAME_OPTIONS = "DENY"
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
 
+# Everything, including django.request 500s with tracebacks, goes to stdout,
+# where `dokku logs` reads it: JSON lines in production, plain text in debug.
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "formatters": {
+        "json": {"()": "bitesize_server.log_format.JsonFormatter"},
+        "text": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"},
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "stream": "ext://sys.stdout",
+            "formatter": "text" if DEBUG else "json",
+        }
+    },
     "root": {"handlers": ["console"], "level": os.environ.get("DJANGO_LOG_LEVEL", "INFO")},
 }
+
+# Who gets error emails (Django's mail_admins handler). Nothing is sent until
+# ADMINS is set and an email backend is configured.
+ADMINS = env_list("DJANGO_ADMINS")
+SERVER_EMAIL = os.environ.get("DJANGO_SERVER_EMAIL") or "root@localhost"
 
 # Server AI: Gemini API with the server's key (see server/README.md).
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")

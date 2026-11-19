@@ -19,7 +19,7 @@ The SQLite file defaults to `server/db.sqlite3` (gitignored).
 
 ## News sources
 
-`/sources/` (login required) lists a user's feeds and lets them add one by URL (checked as RSS/Atom with feedparser, 10 s timeout), turn it on or off, remove it, or pick from the starter catalogue. The catalogue is the repo's `sources.json`, read at runtime. To give a user the whole catalogue:
+`/sources/` (login required) lists a user's feeds and lets them add one by URL (checked as RSS/Atom with feedparser, 10 s timeout; only http/https on ports 80/443, and the host and every redirect must resolve to public IPs), turn it on or off, remove it, or pick from the starter catalogue. The catalogue is the repo's `sources.json`, read at runtime. To give a user the whole catalogue:
 
 ```bash
 python server/manage.py add_starter_sources <username> [--category Tech ...]
@@ -39,12 +39,16 @@ python server/manage.py add_starter_sources <username> [--category Tech ...]
 | `DJANGO_CSRF_TRUSTED_ORIGINS` | empty | Comma-separated, with scheme: `https://bitesize.example.com` |
 | `DJANGO_DB_PATH` | `server/db.sqlite3` (`/app/data/server.sqlite3` in the image) | SQLite file path |
 | `DJANGO_TIME_ZONE` | `UTC` | |
-| `DJANGO_LOG_LEVEL` | `INFO` | |
+| `DJANGO_LOG_LEVEL` | `INFO` | Logs go to stdout: one JSON object per line in production, plain text in debug |
+| `DJANGO_ADMINS` | empty | Comma-separated emails for Django's error emails. Nothing is sent until an email backend is configured |
+| `DJANGO_SERVER_EMAIL` | `root@localhost` | Sender of those error emails |
 | `DJANGO_SESSION_DAYS` | `365` | How long a login lasts |
 | `DJANGO_LOGIN_FAILURES_PER_ACCOUNT` | `5` | Failed PINs before the account locks |
 | `DJANGO_LOGIN_FAILURES_PER_IP` | `20` | Failed PINs before the client IP locks |
 | `DJANGO_LOGIN_LOCKOUT_MINUTES` | `15` | Lock length, counted from the last failure |
 | `DJANGO_INVITE_DAYS` | `14` | How long a sign-up invite stays valid |
+| `DJANGO_ADMIN_PATH` | `admin` | URL path of the Django admin (staff only). Set a non-obvious path in production |
+| `DJANGO_HSTS_SECONDS` | `86400` (1 day) | HSTS max-age when `DJANGO_DEBUG` is off. Raise it (e.g. `31536000`) once HTTPS has held up |
 | `DJANGO_EDITIONS_DIR` | `server/media/editions` (`/app/data/editions` in the image) | Built EPUBs, under `<user id>/<date>/` |
 | `GEMINI_API_KEY` | empty | Server's Gemini API key. Empty means no AI: editions build without summaries. Set it with `dokku config:set`, never in git |
 | `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Any current Gemini model code |
@@ -116,5 +120,7 @@ git push dokku <branch>:main
 dokku ps:scale bitesize web=1 worker=1
 dokku letsencrypt:enable bitesize
 ```
+
+With `DJANGO_DEBUG` off the app redirects plain HTTP to HTTPS (except `/healthz`, so container health checks can call it directly), sends HSTS, and marks the session and CSRF cookies secure. `python server/manage.py check --deploy` should report only `security.W021` (HSTS preload, deliberately off).
 
 The `/app/data` mount keeps the SQLite file across deploys; without it every deploy starts from an empty database.

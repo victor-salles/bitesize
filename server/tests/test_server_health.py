@@ -29,3 +29,12 @@ def test_healthz_reports_503_when_database_fails(client):
 @pytest.mark.django_db
 def test_healthz_rejects_post(client):
     assert client.post("/healthz").status_code == 405
+
+
+@pytest.mark.django_db
+def test_healthz_answers_plain_http_when_https_is_enforced(client, settings):
+    """Dokku and uptime probes may call the container over plain HTTP."""
+    settings.SECURE_SSL_REDIRECT = True  # off in settings_test so other tests use plain http
+
+    assert client.get("/healthz").status_code == 200
+    assert client.get("/login/").status_code == 301
