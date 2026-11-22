@@ -1,6 +1,7 @@
 from math import ceil
 
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
@@ -12,7 +13,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods, require_safe
 
 from . import throttle
-from .forms import InviteForm, LoginForm, SignupForm
+from .forms import DeliveryForm, InviteForm, LoginForm, SignupForm
 from .models import Invite, InviteUnavailable, redeem_invite
 
 WRONG = "Wrong name or PIN."
@@ -83,6 +84,26 @@ def login_view(request):
 @login_required
 def home(request):
     return redirect("editions:status")
+
+
+@require_http_methods(["GET", "POST"])
+@login_required
+def delivery(request):
+    profile = request.user.profile
+    # Read before validation: a rejected form still writes its values onto the instance.
+    has_kindle_email = bool(profile.kindle_email)
+    form = DeliveryForm(request.POST or None, instance=profile)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Delivery settings saved.")
+        return redirect("delivery")
+    return render(request, "accounts/delivery.html", {"form": form, "has_kindle_email": has_kindle_email})
+
+
+@require_safe
+@login_required
+def account(request):
+    return render(request, "accounts/account.html")
 
 
 def _staff_only(request):

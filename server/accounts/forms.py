@@ -4,7 +4,7 @@ from django import forms
 from django.contrib.auth.models import User
 from django.core.validators import RegexValidator
 
-from core.models import validate_kindle_email
+from core.models import Profile, validate_kindle_email
 
 PIN_PATTERN = re.compile(r"[0-9]{4,6}")
 NAME_VALIDATOR = RegexValidator(
@@ -95,3 +95,36 @@ class LoginForm(forms.Form):
 
 class InviteForm(forms.Form):
     note = forms.CharField(label="Who is it for?", max_length=120, required=False)
+
+
+class DeliveryForm(forms.ModelForm):
+    """Where and when a reader's edition arrives."""
+
+    class Meta:
+        model = Profile
+        fields = ["kindle_email", "delivery_time", "timezone", "language"]
+        labels = {
+            "kindle_email": "Send-to-Kindle address",
+            "delivery_time": "Delivery time",
+            "timezone": "Time zone",
+            "language": "Edition language",
+        }
+        help_texts = {
+            "kindle_email": "Ends in @kindle.com. Find it on Amazon under Manage Your Content and Devices.",
+            "delivery_time": "When the edition should arrive, as HH:MM in your time zone.",
+            "timezone": "A name like America/Sao_Paulo or Europe/Lisbon.",
+            "language": "Summaries and covers are written in this language.",
+        }
+        widgets = {
+            "kindle_email": forms.EmailInput(attrs={"autocapitalize": "none", "autocorrect": "off", "spellcheck": "false"}),
+            "delivery_time": forms.TimeInput(format="%H:%M", attrs={"inputmode": "numeric"}),
+            "timezone": forms.TextInput(attrs={"autocapitalize": "none", "autocorrect": "off", "spellcheck": "false"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Blank in the model so a profile can exist before sign-up sets it; never blank once set here.
+        self.fields["kindle_email"].required = True
+
+    def clean_kindle_email(self) -> str:
+        return self.cleaned_data["kindle_email"].lower()
