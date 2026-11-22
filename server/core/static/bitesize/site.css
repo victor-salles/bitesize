@@ -116,6 +116,8 @@ input, select, textarea, button {
   background: #fff; background: var(--paper);
   border: 2px solid #000; border: var(--border-thick);
   border-radius: 0;
+  text-align: center;
+  text-align-last: center; /* selects centre their shown option only with this */
 }
 input[type="hidden"] { display: none; }
 button { margin-top: 1.5rem; margin-top: var(--space-4); font-weight: bold; cursor: pointer; }
