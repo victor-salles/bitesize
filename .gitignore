@@ -26,3 +26,4 @@ MOBILE_HANDOFF.local.md
 server/db.sqlite3*
 server/staticfiles/
 server/media/
+server/backups/

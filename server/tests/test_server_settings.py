@@ -18,6 +18,8 @@ ENV_VARS = [
     "DJANGO_ADMIN_PATH",
     "DJANGO_ADMINS",
     "DJANGO_SERVER_EMAIL",
+    "DJANGO_BACKUP_DIR",
+    "DJANGO_BACKUP_KEEP",
 ]
 
 
@@ -198,3 +200,19 @@ def test_admins_and_sender_from_env(load_settings):
 
     assert settings.ADMINS == ["victor@example.com", "ops@example.com"]
     assert settings.SERVER_EMAIL == "bitesize@example.com"
+
+
+def test_backups_default_next_to_the_database(load_settings, tmp_path):
+    settings = load_settings(DJANGO_SECRET_KEY="s3cr3t", DJANGO_DB_PATH=str(tmp_path / "server.sqlite3"))
+
+    assert settings.BACKUP_DIR == tmp_path / "backups"
+    assert settings.BACKUP_KEEP == 14
+
+
+def test_backups_read_env(load_settings, tmp_path):
+    settings = load_settings(
+        DJANGO_SECRET_KEY="s3cr3t", DJANGO_BACKUP_DIR=str(tmp_path / "elsewhere"), DJANGO_BACKUP_KEEP="3"
+    )
+
+    assert settings.BACKUP_DIR == tmp_path / "elsewhere"
+    assert settings.BACKUP_KEEP == 3

@@ -4,6 +4,11 @@
       "command": "python server/manage.py enqueue_due_editions",
       "schedule": "*/10 * * * *",
       "concurrency_policy": "forbid"
+    },
+    {
+      "command": "python server/manage.py backup_database",
+      "schedule": "0 3 * * *",
+      "concurrency_policy": "forbid"
     }
   ],
   "healthchecks": {
