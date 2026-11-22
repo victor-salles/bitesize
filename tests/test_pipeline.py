@@ -1,4 +1,5 @@
 import json
+import socket
 from datetime import datetime
 
 import pytest
@@ -210,3 +211,76 @@ def test_article_cache_does_not_store_fallback_results(tmp_path, monkeypatch, no
 
     assert cache.rows == {}
     assert result.kept_count == 3  # no-summary edition keeps everything
+
+
+# ── Internal addresses ───────────────────────────────────────────────────────
+
+INTERNAL_RSS = b"""<?xml version="1.0"?>
+<rss version="2.0"><channel><title>T</title>
+<item><title>Rates hold steady</title><link>https://example.com/a</link>
+<description>Short snippet.</description></item>
+<item><title>Cloud metadata</title><link>http://metadata.internal/latest/</link>
+<description>Looks like news.</description></item>
+</channel></rss>"""
+
+ARTICLE_HTML = (
+    "<html><head><title>Rates hold steady</title></head><body><article><h1>Rates hold steady</h1>"
+    + "".join(f"<p>{BODY}</p>" for _ in range(3))
+    + "</article></body></html>"
+).encode()
+
+
+class FakeResponse:
+    def __init__(self, body):
+        self.status_code = 200
+        self.headers = {}
+        self.body = body
+
+    def iter_content(self, chunk_size=1):
+        yield self.body
+
+    def close(self):
+        pass
+
+
+@pytest.fixture
+def fake_network(monkeypatch):
+    """Serve the feed and the public article through safe_fetch; record every URL opened."""
+    import safe_fetch
+
+    pages = {"https://feeds.example.com/rss": INTERNAL_RSS, "https://example.com/a": ARTICLE_HTML}
+    ips = {"metadata.internal": "169.254.169.254"}
+    opened = []
+
+    def fake_getaddrinfo(host, port, *args, **kwargs):
+        ip = ips.get(host, "93.184.215.14")
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (ip, port))]
+
+    def fake_open(_session, target, **kwargs):
+        opened.append(target.url)
+        return FakeResponse(pages.get(target.url, b""))
+
+    monkeypatch.setattr(safe_fetch.socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr(safe_fetch, "_open", fake_open)
+    return opened
+
+
+def test_build_edition_skips_an_article_on_an_internal_address(tmp_path, fake_network, no_global_config):
+    result = build_edition(
+        EditionConfig(
+            sources={"Economy": {"Wire": "https://feeds.example.com/rss"}},
+            output_dir=tmp_path,
+            settings=Settings(ai_backend="does-not-exist"),
+            language="en",
+            ai=FakeAI(),
+            now=datetime(2026, 11, 13, 7, 0),
+        )
+    )
+
+    assert not any("metadata.internal" in url for url in fake_network)
+    assert result.epub_path is not None and result.epub_path.exists()
+    assert (result.raw_count, result.full_text_count, result.article_count) == (1, 1, 1)
+    book = epub.read_epub(str(result.epub_path))
+    pages = b"".join(item.get_content() for item in book.get_items())
+    assert b"Rates hold steady" in pages
+    assert b"Cloud metadata" not in pages

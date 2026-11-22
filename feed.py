@@ -2,31 +2,30 @@ import html
 import re
 from datetime import datetime
 
-import certifi
 import feedparser
-import requests
-import trafilatura
 from bs4 import BeautifulSoup
 
+import safe_fetch
 from config import console, get_settings
 
 
 def _download_url(url: str, quiet: bool = False) -> bytes | None:
-    """Fetch URL bytes using certifi-backed TLS (macOS Python venv safe)."""
+    """Fetch URL bytes from a public address (see safe_fetch).
+
+    Returns None when the site fails. Raises safe_fetch.FetchError when the
+    address is blocked, so callers can drop what pointed at it.
+    """
     settings = get_settings()
     try:
-        session = requests.Session()
-        session.trust_env = False
-        response = session.get(
+        return safe_fetch.fetch(
             url,
             timeout=settings.feed_timeout,
-            headers={"User-Agent": settings.user_agent},
-            verify=certifi.where(),
-            allow_redirects=True,
+            user_agent=settings.user_agent,
+            allow_private=settings.allow_private_addresses,
         )
-        response.raise_for_status()
-        return response.content
-    except requests.RequestException as exc:
+    except safe_fetch.FetchError as exc:
+        if exc.blocked:
+            raise
         if not quiet:
             console.print(f"  [yellow]⚠  fetch failed {url}: {exc}[/yellow]")
         return None
@@ -101,6 +100,7 @@ def fetch_article_content(url: str) -> str:
     Fetch the full text of an article using trafilatura.
     Falls back to archive mirrors when direct fetch fails or hits a paywall.
     Returns extracted plain text, or empty string on failure.
+    Raises safe_fetch.FetchError when the article's address is blocked.
     """
     from paywall import fetch_with_paywall_bypass
 

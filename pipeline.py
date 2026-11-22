@@ -23,6 +23,7 @@ from ai_locale import epub_label, format_digest_timestamp
 from config import console, get_settings, submit_in_context, use_settings
 from epub import generate_epub
 from feed import fetch_article_content, fetch_feed, filter_headline_only
+from safe_fetch import FetchError
 from gemini import generate_global_cover, generate_section_cover, process_articles, spread_tied_scores
 from magazine_layers import article_rank_sort_key
 from paywall import log_summary, reset_stats
@@ -87,6 +88,15 @@ class EditionResult:
     filtered_count: int = 0
     article_count: int = 0
     section_counts: dict[str, int] = field(default_factory=dict)
+
+
+def _log_blocked(blocked: list[dict]) -> None:
+    console.print(
+        f"  [yellow]✗  skipped {len(blocked)} article(s) on a private or "
+        f"non-web address:[/yellow]"
+    )
+    for art in blocked:
+        console.print(f"    [dim]· {art['source']}: {art['url']}[/dim]")
 
 
 def _log_headline_drops(dropped: list[dict]) -> None:
@@ -206,15 +216,30 @@ def _build(config: EditionConfig) -> EditionResult:
                     for art in flat_for_content
                 }
                 fetched = 0
+                blocked: list[dict] = []
                 for fut in as_completed(future_to_art):
                     art = future_to_art[fut]
-                    content = fut.result()
+                    try:
+                        content = fut.result()
+                    except FetchError as exc:
+                        if not exc.blocked:
+                            raise
+                        blocked.append(art)
+                        prog.advance(task)
+                        continue
                     if content:
                         if not art.get("rss_snippet"):
                             art["rss_snippet"] = art.get("content", "")
                         art["content"] = content
                         fetched += 1
                     prog.advance(task)
+
+        if blocked:
+            _log_blocked(blocked)
+            blocked_ids = {id(art) for art in blocked}
+            for cat in raw_sections:
+                raw_sections[cat] = [art for art in raw_sections[cat] if id(art) not in blocked_ids]
+            total_raw -= len(blocked)
 
         console.print(
             f"[green]✓[/green]  Full content retrieved for "

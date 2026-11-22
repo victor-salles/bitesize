@@ -96,6 +96,8 @@ One at a time is how the server fits the 1 GB droplet:
 
 `/editions/` (where `/` sends logged-in users) shows today's edition, how many queued or running editions are ahead of it, and an estimated wait from the median run time of the last 20 succeeded editions (10 minutes when none has been built yet). It warns when the wait is over twice that median, and a button queues today's edition through `enqueue_edition`.
 
+The build fetches feeds, article pages and paywall mirrors through `safe_fetch.py` (repo root), with the same rules as adding a source, and connects to the address it checked. An article whose link points at a private or non-web address is logged and left out; the edition still builds.
+
 After an edition is built, the worker sends the `editions.signals.edition_built` signal. Delivery connects there.
 
 ## Daily schedule

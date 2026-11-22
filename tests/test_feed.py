@@ -1,6 +1,9 @@
-from unittest.mock import MagicMock, patch
+import pytest
 
 import feed
+import safe_fetch
+from config import use_settings
+from settings_store import Settings
 
 
 SAMPLE_RSS = b"""<?xml version="1.0"?>
@@ -39,17 +42,44 @@ def test_fetch_feed_fail_soft_false_raises_when_download_fails(monkeypatch):
         raise AssertionError("expected RuntimeError")
 
 
-@patch("feed.requests.Session")
-def test_download_url_uses_certifi(mock_session_cls):
-    session = MagicMock()
-    session.get.return_value = MagicMock(
-        content=b"ok",
-        raise_for_status=MagicMock(),
-    )
-    mock_session_cls.return_value = session
-    result = feed._download_url("https://example.com/rss")
-    assert result == b"ok"
-    session.get.assert_called_once()
-    _, kwargs = session.get.call_args
-    assert kwargs["verify"] is not None
-    assert session.trust_env is False
+def test_download_url_fetches_through_safe_fetch_with_the_settings(monkeypatch):
+    calls = []
+
+    def fake_fetch(url, **kwargs):
+        calls.append((url, kwargs))
+        return b"ok"
+
+    monkeypatch.setattr(feed.safe_fetch, "fetch", fake_fetch)
+    with use_settings(Settings(feed_timeout=9, user_agent="ua", allow_private_addresses=True)):
+        assert feed._download_url("https://example.com/rss") == b"ok"
+
+    assert calls == [("https://example.com/rss", {"timeout": 9, "user_agent": "ua", "allow_private": True})]
+
+
+def test_download_url_returns_none_when_the_site_fails(monkeypatch):
+    def fake_fetch(url, **kwargs):
+        raise safe_fetch.FetchError(safe_fetch.Reason.TIMEOUT, url)
+
+    monkeypatch.setattr(feed.safe_fetch, "fetch", fake_fetch)
+    with use_settings(Settings()):
+        assert feed._download_url("https://example.com/rss", quiet=True) is None
+
+
+def test_download_url_raises_when_the_address_is_blocked(monkeypatch):
+    def fake_fetch(url, **kwargs):
+        raise safe_fetch.FetchError(safe_fetch.Reason.PRIVATE, url)
+
+    monkeypatch.setattr(feed.safe_fetch, "fetch", fake_fetch)
+    with use_settings(Settings()), pytest.raises(safe_fetch.FetchError) as excinfo:
+        feed._download_url("http://10.0.0.5/rss")
+
+    assert excinfo.value.reason is safe_fetch.Reason.PRIVATE
+
+
+def test_fetch_feed_skips_a_feed_on_a_blocked_address(monkeypatch):
+    def fake_download(url, quiet=False):
+        raise safe_fetch.FetchError(safe_fetch.Reason.PRIVATE, url)
+
+    monkeypatch.setattr(feed, "_download_url", fake_download)
+    with use_settings(Settings()):
+        assert feed.fetch_feed("Internal", "http://10.0.0.5/rss") == []

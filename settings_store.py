@@ -34,6 +34,7 @@ SETTINGS_DEFAULTS: dict[str, tuple[str, str, Any]] = {
         "str",
         "BiteSIze/1.0 (+https://github.com/local/bitesize)",
     ),
+    "allow_private_addresses": ("feed", "bool", False),
     "min_body_chars": ("filter", "int", 180),
     "min_summary_chars": ("filter", "int", 80),
     "index_entries_per_page": ("epub", "int", 10),
@@ -75,6 +76,8 @@ class Settings:
     feed_timeout: int = 15
     truncate_chars: int = 450
     user_agent: str = "BiteSIze/1.0 (+https://github.com/local/bitesize)"
+    # Fetch feeds and articles on loopback/private networks. Off on the server.
+    allow_private_addresses: bool = False
     min_body_chars: int = 180
     min_summary_chars: int = 80
     index_entries_per_page: int = 10
