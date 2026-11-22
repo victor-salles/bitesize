@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% comment %}Rendered without a request: no user, no tabs, no messages.{% endcomment %}
+{% block title %}Error · BiteSIze{% endblock %}
+{% block content %}
+<h1>Something went wrong</h1>
+<p>The server hit an error. Try again in a few minutes. If it keeps happening, tell Victor.</p>
+<p><a href="{% url 'home' %}">Go to your editions</a></p>
+{% endblock %}
