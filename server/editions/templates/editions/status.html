@@ -19,7 +19,9 @@
 {% endif %}
 {% endwith %}
 
-{% if can_request %}
+{% if no_sources_message %}
+<p>{{ no_sources_message }} <a href="{% url 'sources:list' %}">Go to your sources</a>.</p>
+{% elif can_request %}
 <form method="post" action="{% url 'editions:request_today' %}">
   {% csrf_token %}
   <button type="submit">Request today's edition</button>

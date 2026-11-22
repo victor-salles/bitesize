@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 from django_tasks_db.models import DBTaskResult
 
-from core.models import Edition
+from core.models import Edition, Source
 from editions.services import DEFAULT_RUN_TIME, QueueStatus, queue_status
 
 NOW = datetime(2026, 11, 15, 12, 0, tzinfo=dt_timezone.utc)
@@ -172,6 +172,14 @@ def test_today_is_the_users_local_date(ana):
 
 @pytest.fixture
 def client_ana(client, ana):
+    # Requesting an edition needs an active source, so the page tests give Ana one.
+    Source.objects.create(user=ana, name="BBC", url="https://bbc.co.uk/ana", category="World")
+    client.force_login(ana)
+    return client
+
+
+@pytest.fixture
+def client_without_sources(client, ana):
     client.force_login(ana)
     return client
 
@@ -269,3 +277,22 @@ def test_request_queues_todays_edition_once(client_ana, ana):
 
 def test_request_rejects_get(client_ana):
     assert client_ana.get(reverse("editions:request_today")).status_code == 405
+
+
+def test_page_without_sources_points_to_sources_instead_of_requesting(client_without_sources):
+    body = client_without_sources.get(reverse("editions:status")).content.decode()
+
+    assert "Add at least one active source before requesting an edition." in body
+    assert f'href="{reverse("sources:list")}"' in body
+    assert f'action="{reverse("editions:request_today")}"' not in body
+
+
+def test_request_without_sources_queues_nothing(client_without_sources):
+    response = client_without_sources.post(reverse("editions:request_today"), follow=True)
+
+    assert response.redirect_chain == [(reverse("editions:status"), 302)]
+    assert [str(m) for m in response.context["messages"]] == [
+        "Add at least one active source before requesting an edition."
+    ]
+    assert not Edition.objects.exists()
+    assert DBTaskResult.objects.count() == 0
