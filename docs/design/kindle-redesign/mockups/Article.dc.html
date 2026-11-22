@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Matéria</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#111;text-decoration:none}a:hover{color:#3a3a3a}
+</style>
+</helmet>
+<div style="width: 600px; height: 800px; box-sizing: border-box; padding: 26px 32px; display: flex; flex-direction: column; background: #ffffff; color: #111111; font-family: 'Source Serif 4', Georgia, serif">
+
+  <div style="display: flex; justify-content: space-between; font-family: Inter, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #595959; border-bottom: 1px solid #d4d4d4; padding-bottom: 8px">
+    <span>01 · Tecnologia</span>
+    <span>1 de 3 nesta editoria</span>
+  </div>
+
+  <h1 style="margin: 16px 0 0; font-size: 32px; font-weight: 700; line-height: 1.12">Cidade testa ônibus elétricos sem motorista em linha noturna</h1>
+  <div style="display: flex; gap: 8px; margin-top: 10px; font-family: Inter, sans-serif; font-size: 13px; font-weight: 500; color: #3a3a3a">
+    <span style="font-weight: 700; color: #111111">Jornal Exemplo</span><span>·</span><span>8 nov, 06:30</span><span>·</span><span>5 min</span>
+  </div>
+
+  <sc-if value="{{showSummary}}" hint-placeholder-val="{{ true }}">
+    <div style="margin-top: 16px; border-top: 3px solid #111111; border-bottom: 1px solid #111111; padding: 12px 0 14px; display: flex; flex-direction: column; gap: 8px">
+      <div style="display: flex; justify-content: space-between; align-items: center; font-family: Inter, sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase">
+        <span>Resumo</span>
+        <span style="display: flex; align-items: center; gap: 8px; color: #3a3a3a">
+          <span style="display: flex; gap: 2px"><sc-for list="{{bar}}" as="s" hint-placeholder-count="10"><span style="width: 7px; height: 7px; box-sizing: border-box; border: 1px solid #111111; background: {{s.bg}}; display: inline-block"></span></sc-for></span>
+          Relevância 9,2
+        </span>
+      </div>
+      <p style="margin: 0; font-size: 18px; line-height: 1.45">Piloto de seis meses cobre 12 km entre o centro e o aeroporto, com um operador a bordo.</p>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px; font-family: Inter, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase">
+        <span style="border: 1px solid #111111; background: #111111; color: #ffffff; padding: 3px 7px">Artigo completo</span>
+        <span style="border: 1px solid #6b6b6b; padding: 3px 7px">tecnologia</span>
+        <span style="border: 1px solid #6b6b6b; padding: 3px 7px">brasil</span>
+      </div>
+    </div>
+  </sc-if>
+
+  <div style="margin-top: 18px; display: flex; flex-direction: column; gap: 14px; font-size: 18px; line-height: 1.55">
+    <p style="margin: 0"><span style="float: left; font-size: 58px; line-height: 0.85; font-weight: 700; padding: 4px 8px 0 0">E</span>ste é um texto de exemplo para a documentação do BiteSIze. Ele ocupa o lugar do artigo completo que o digest extrai da fonte original, com parágrafos e capitular.</p>
+    <p style="margin: 0">Na edição real, cada matéria traz o texto da fonte, um resumo escrito pelo modelo escolhido nas configurações e uma nota de relevância de 0 a 10 calculada a partir dos temas que você ordenou no painel.</p>
+  </div>
+
+  <div style="flex-grow: 1"></div>
+
+  <div style="display: flex; flex-direction: column; gap: 6px; border-top: 1px solid #d4d4d4; padding-top: 10px; font-family: Inter, sans-serif; font-size: 12px; color: #595959">
+    <span>Fonte original: jornalexemplo.com.br/onibus-noturno</span>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 10px; border-top: 2px solid #111111; font-family: Inter, sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase">
+    <a href="Section.dc.html" style="padding: 12px 0; min-height: 44px; box-sizing: border-box">← Tecnologia</a>
+    <a href="Opening.dc.html" style="padding: 12px 0; text-align: center; min-height: 44px; box-sizing: border-box">Sumário</a>
+    <a href="Article.dc.html" style="padding: 12px 0; text-align: right; min-height: 44px; box-sizing: border-box">02 Próxima →</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"showSummary":{"editor":"boolean","default":true},"$preview":{"width":600,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      showSummary: this.props.showSummary ?? true,
+      bar: Array.from({ length: 10 }, (_, i) => ({ bg: i < 9 ? '#111111' : '#ffffff' }))
+    };
+  }
+}
+</script>
+</body>
+</html>
