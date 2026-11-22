@@ -58,6 +58,14 @@ class EditionError(Exception):
     """An edition that cannot be built, with a message for the user and the admin."""
 
 
+NO_SOURCES_MESSAGE = "Add at least one active source before requesting an edition."
+
+
+def has_active_sources(user) -> bool:
+    """An edition is built from the reader's active sources, so without one it can only fail."""
+    return Source.objects.active().filter(user=user).exists()
+
+
 def enqueue_edition(user, edition_date: date) -> Edition:
     """Queue `user`'s edition for `edition_date`.
 

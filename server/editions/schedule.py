@@ -12,9 +12,9 @@ from zoneinfo import ZoneInfo
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-from core.models import Edition, Source
+from core.models import Edition
 
-from .services import enqueue_edition
+from .services import enqueue_edition, has_active_sources
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +42,6 @@ def enqueue_due_editions(now=None) -> list[Edition]:
 def _not_ready_reason(user) -> str:
     if not user.profile.kindle_email:
         return "no Kindle address"
-    if not Source.objects.active().filter(user=user).exists():
+    if not has_active_sources(user):
         return "no active sources"
     return ""
