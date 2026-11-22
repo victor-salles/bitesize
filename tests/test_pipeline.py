@@ -50,6 +50,7 @@ class FakeAI:
                     "skip": "Sneaker" in line,
                     "summary": "The bank held rates. Markets were calm.",
                     "relevance": 80 - i,
+                    "temas": ["economia"],
                 })
             return json.dumps(rows)
         return None
@@ -110,9 +111,36 @@ def test_build_edition_from_in_memory_inputs(tmp_path, monkeypatch, no_global_co
     assert any(l.startswith("section-cover:Economy") for l in ai.labels)
     assert (tmp_path / "out" / "logs" / "paywall-stats.log").exists()
 
+    assert result.topic_counts == {"economia": 1}
+
     book = epub.read_epub(str(result.epub_path))
     assert book.get_metadata("DC", "language")[0][0].startswith("en")
+    assert "November 13, 2026" in book.get_metadata("DC", "title")[0][0]  # config.now, not the clock
     assert config._settings is None  # never loaded the global settings
+
+
+def test_build_edition_passes_the_edition_history_to_the_epub(tmp_path, monkeypatch, no_global_config):
+    monkeypatch.setattr(feed, "_download_url", lambda url, quiet=False: RSS)
+    monkeypatch.setattr(pipeline, "fetch_article_content", lambda url: BODY)
+    seen = []
+    monkeypatch.setattr(pipeline, "generate_epub", lambda *args, meta: seen.append(meta))
+
+    build_edition(
+        EditionConfig(
+            sources={"Economy": {"Wire": "https://feeds.example.com/rss"}},
+            output_dir=tmp_path,
+            settings=Settings(ai_backend="does-not-exist"),
+            ai=FakeAI(),
+            now=datetime(2026, 11, 13, 7, 0),
+            edition_number=12,
+            previous_topic_counts={"economia": 3},
+        )
+    )
+
+    (meta,) = seen
+    assert meta.now == datetime(2026, 11, 13, 7, 0)
+    assert meta.edition_number == 12
+    assert meta.previous_topic_counts == {"economia": 3}
 
 
 def test_build_edition_without_readable_articles_writes_nothing(
