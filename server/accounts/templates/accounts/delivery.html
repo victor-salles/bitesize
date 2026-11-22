@@ -2,7 +2,7 @@
 {% block title %}Delivery · BiteSIze{% endblock %}
 {% block content %}
 <h1>Delivery</h1>
-{% if not user.profile.kindle_email %}
+{% if not has_kindle_email %}
   <p class="notice">No Kindle address yet: editions have nowhere to go.</p>
 {% endif %}
 <form method="post" action="{% url 'delivery' %}" novalidate>

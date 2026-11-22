@@ -98,6 +98,15 @@ def test_delivery_warns_when_there_is_no_kindle_address(client_ana, ana):
     assert b"No Kindle address yet: editions have nowhere to go." in response.content
 
 
+def test_delivery_keeps_the_warning_after_a_rejected_address(client_ana, ana):
+    ana.profile.kindle_email = ""
+    ana.profile.save()
+
+    response = client_ana.post(reverse("delivery"), valid_settings(kindle_email="ana@gmail.com"))
+
+    assert b"No Kindle address yet: editions have nowhere to go." in response.content
+
+
 def test_editions_page_links_a_missing_kindle_address_to_delivery(client_ana, ana):
     ana.profile.kindle_email = ""
     ana.profile.save()

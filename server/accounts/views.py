@@ -89,12 +89,15 @@ def home(request):
 @require_http_methods(["GET", "POST"])
 @login_required
 def delivery(request):
-    form = DeliveryForm(request.POST or None, instance=request.user.profile)
+    profile = request.user.profile
+    # Read before validation: a rejected form still writes its values onto the instance.
+    has_kindle_email = bool(profile.kindle_email)
+    form = DeliveryForm(request.POST or None, instance=profile)
     if request.method == "POST" and form.is_valid():
         form.save()
         messages.success(request, "Delivery settings saved.")
         return redirect("delivery")
-    return render(request, "accounts/delivery.html", {"form": form})
+    return render(request, "accounts/delivery.html", {"form": form, "has_kindle_email": has_kindle_email})
 
 
 @require_safe
