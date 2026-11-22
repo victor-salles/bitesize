@@ -1,6 +1,7 @@
 import socket
 from unittest.mock import MagicMock
 
+import certifi
 import pytest
 
 import safe_fetch
@@ -101,6 +102,7 @@ def test_open_connects_to_the_address_and_keeps_the_hostname(addresses):
     assert args == (f"https://{PUBLIC_IP}/feed",)
     assert kwargs["headers"] == {"User-Agent": "ua", "Host": "example.com"}
     assert (kwargs["timeout"], kwargs["allow_redirects"], kwargs["stream"]) == (7, False, True)
+    assert kwargs["verify"] == certifi.where()
     assert session.trust_env is False
     (prefix, adapter), _ = session.mount.call_args
     assert prefix == "https://"

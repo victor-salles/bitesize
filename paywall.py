@@ -11,6 +11,7 @@ from urllib.parse import quote
 import trafilatura
 
 from config import OUTPUT_DIR, get_settings
+from safe_fetch import FetchError
 
 # Order: most recommended first (matches Shortcut's archive.is recommendation).
 MIRRORS: list[tuple[str, Callable[[str], str]]] = [
@@ -164,6 +165,7 @@ def fetch_with_paywall_bypass(url: str) -> tuple[str, str | None]:
     Fetch article body: direct URL first, then archive mirrors.
 
     Returns (text, source) where source is 'direct', a mirror name, or None.
+    Raises safe_fetch.FetchError when `url` itself is on a blocked address.
     """
     if not url.strip():
         return "", None
@@ -184,7 +186,10 @@ def fetch_with_paywall_bypass(url: str) -> tuple[str, str | None]:
     for name, build_mirror in MIRRORS:
         mirror_url = build_mirror(url)
         _record_mirror(name, attempt=True)
-        raw = _download_url(mirror_url, quiet=True)
+        try:
+            raw = _download_url(mirror_url, quiet=True)
+        except FetchError:  # a mirror redirected somewhere blocked
+            continue
         if not raw:
             continue
         text = _extract_text(raw)
