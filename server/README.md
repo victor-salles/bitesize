@@ -50,6 +50,8 @@ python server/manage.py add_starter_sources <username> [--category Tech ...]
 | `DJANGO_ADMIN_PATH` | `admin` | URL path of the Django admin (staff only). Set a non-obvious path in production |
 | `DJANGO_HSTS_SECONDS` | `86400` (1 day) | HSTS max-age when `DJANGO_DEBUG` is off. Raise it (e.g. `31536000`) once HTTPS has held up |
 | `DJANGO_EDITIONS_DIR` | `server/media/editions` (`/app/data/editions` in the image) | Built EPUBs, under `<user id>/<date>/` |
+| `DJANGO_BACKUP_DIR` | `backups/` next to the SQLite file (`/app/data/backups` in the image) | Daily database copies, see [Backups](#backups) |
+| `DJANGO_BACKUP_KEEP` | `14` | How many backups to keep; older ones are deleted after each run |
 | `GEMINI_API_KEY` | empty | Server's Gemini API key. Empty means no AI: editions build without summaries. Set it with `dokku config:set`, never in git |
 | `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Any current Gemini model code |
 | `GEMINI_DAILY_REQUEST_CAP` | `200` | Gemini requests per day (server time zone), covers included. Past it, editions build without summaries |
@@ -102,6 +104,8 @@ After an edition is built, the worker sends the `editions.signals.edition_built`
 
 Dokku runs it every ten minutes from the `cron` entry in the repo-root `app.json` (`dokku cron:list bitesize` shows it). Cron uses the server's clock (UTC); each reader's time zone is applied by the command. An edition is queued up to ten minutes after the delivery time, plus its wait in the queue and its build time. A delivery time after 23:50 local is never reached, because the next run already falls on the next local day.
 
+`app.json` also runs `backup_database` daily at 03:00 UTC: see [Backups](#backups).
+
 `app.json` also declares a startup healthcheck on `/healthz` (port 8000): Dokku sends traffic to a new deploy only once it answers 200.
 
 ## Deploy (Dokku)
@@ -110,9 +114,9 @@ Dokku runs it every ten minutes from the `cron` entry in the repo-root `app.json
 dokku apps:create bitesize
 dokku builder:set bitesize selected dockerfile
 dokku ports:set bitesize http:80:8000
-dokku storage:ensure-directory bitesize
+dokku storage:create bitesize                          # /var/lib/dokku/data/storage/bitesize
 chown 1000:1000 /var/lib/dokku/data/storage/bitesize   # the image runs as uid 1000
-dokku storage:mount bitesize /var/lib/dokku/data/storage/bitesize:/app/data
+dokku storage:mount bitesize bitesize --container-dir /app/data
 dokku config:set bitesize DJANGO_SECRET_KEY=... \
   DJANGO_ALLOWED_HOSTS=bitesize.victorsalles.com \
   DJANGO_CSRF_TRUSTED_ORIGINS=https://bitesize.victorsalles.com
@@ -121,6 +125,32 @@ dokku ps:scale bitesize web=1 worker=1
 dokku letsencrypt:enable bitesize
 ```
 
+`storage:create` replaces the deprecated `storage:ensure-directory`. An app mounted the old way (`dokku storage:mount bitesize /var/lib/dokku/data/storage/bitesize:/app/data`) uses the same host directory and needs no change. `dokku storage:report bitesize` shows the mount.
+
 With `DJANGO_DEBUG` off the app redirects plain HTTP to HTTPS (except `/healthz`, so container health checks can call it directly), sends HSTS, and marks the session and CSRF cookies secure. `python server/manage.py check --deploy` should report only `security.W021` (HSTS preload, deliberately off).
 
-The `/app/data` mount keeps the SQLite file across deploys; without it every deploy starts from an empty database.
+Everything that must survive a deploy lives under the `/app/data` mount: the SQLite file (`DJANGO_DB_PATH`), built EPUBs (`DJANGO_EDITIONS_DIR`) and backups (`DJANGO_BACKUP_DIR`). The image sets the first two to `/app/data/...`, and backups default to the database's folder. Without the mount every deploy starts from an empty database. Cron entries from `app.json` are picked up on deploy (`dokku cron:list bitesize`).
+
+## Backups
+
+`python server/manage.py backup_database` copies the database with SQLite's backup API, which is consistent while the web and worker processes write, to `DJANGO_BACKUP_DIR/server-<UTC timestamp>.sqlite3`, then deletes all but the newest `DJANGO_BACKUP_KEEP`. Dokku runs it daily at 03:00 UTC. On the host the copies are in `/var/lib/dokku/data/storage/bitesize/backups/`.
+
+They sit on the droplet's own disk, so they cover a bad migration or a corrupted file, not losing the droplet. Copy one off now and then:
+
+```bash
+scp personal-droplet:/var/lib/dokku/data/storage/bitesize/backups/server-<timestamp>.sqlite3 .
+```
+
+To restore, on the droplet:
+
+```bash
+dokku ps:stop bitesize
+cd /var/lib/dokku/data/storage/bitesize
+mv server.sqlite3 server.sqlite3.broken
+rm -f server.sqlite3-wal server.sqlite3-shm    # WAL of the old file; would corrupt the restored one
+cp backups/server-<timestamp>.sqlite3 server.sqlite3
+chown 1000:1000 server.sqlite3
+dokku ps:start bitesize
+```
+
+Built EPUBs are not backed up.

@@ -177,11 +177,9 @@ def test_command_uses_the_current_time_and_reports_the_count(three_readers):
 def test_dokku_cron_runs_the_schedule_command():
     app_json = json.loads((Path(__file__).resolve().parents[2] / "app.json").read_text())
 
-    assert app_json["cron"] == [
-        {
-            "command": "python server/manage.py enqueue_due_editions",
-            "schedule": "*/10 * * * *",
-            "concurrency_policy": "forbid",
-        }
-    ]
+    assert {
+        "command": "python server/manage.py enqueue_due_editions",
+        "schedule": "*/10 * * * *",
+        "concurrency_policy": "forbid",
+    } in app_json["cron"]
     assert load_command_class("editions", "enqueue_due_editions")

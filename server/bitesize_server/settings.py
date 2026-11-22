@@ -101,6 +101,11 @@ DATABASES = {
     }
 }
 
+# Daily copies of the SQLite file (`manage.py backup_database`, run from app.json
+# cron). They sit next to the database by default, so they share its Dokku mount.
+BACKUP_DIR = Path(os.environ.get("DJANGO_BACKUP_DIR") or Path(DATABASES["default"]["NAME"]).parent / "backups")
+BACKUP_KEEP = env_int("DJANGO_BACKUP_KEEP", default=14)
+
 # Login lockout counters (accounts.throttle) must be shared by every gunicorn
 # worker, so the cache lives in the SQLite database rather than in process
 # memory: no extra service on the 1 GB droplet, and counts survive restarts.
