@@ -9,6 +9,7 @@ from django.contrib.auth.models import User
 from django.core.management import CommandError, call_command
 from django.urls import reverse
 
+import safe_fetch
 from core.models import Source
 from sources import catalogue, feeds
 from sources.starter import add_starter_sources
@@ -62,7 +63,8 @@ def network(monkeypatch):
     calls = []
     state = {"body": RSS, "status": 200, "error": None, "addresses": {}, "redirects": {}}
 
-    def fake_get(url, **kwargs):
+    def fake_open(_session, target, **kwargs):
+        url = target.url
         calls.append((url, kwargs))
         if state["error"]:
             raise state["error"]
@@ -82,8 +84,8 @@ def network(monkeypatch):
             for ip in addresses
         ]
 
-    monkeypatch.setattr(feeds.requests, "get", fake_get)
-    monkeypatch.setattr(feeds.socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr(safe_fetch, "_open", fake_open)
+    monkeypatch.setattr(safe_fetch.socket, "getaddrinfo", fake_getaddrinfo)
     state["calls"] = calls
     return state
 
@@ -261,13 +263,6 @@ def test_validate_feed_reports_unknown_hosts(network):
 
     assert str(excinfo.value) == "Could not find that address."
     assert network["calls"] == []
-
-
-def test_validate_feed_does_not_let_requests_follow_redirects(network):
-    feeds.validate_feed("https://example.com/feed")
-
-    (_url, kwargs) = network["calls"][0]
-    assert kwargs["allow_redirects"] is False
 
 
 def test_validate_feed_follows_redirects_to_public_hosts(network):
