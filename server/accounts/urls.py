@@ -9,6 +9,8 @@ urlpatterns = [
     path("signup/<str:token>/", views.signup, name="signup"),
     path("invites/", views.invites, name="invites"),
     path("invites/<int:pk>/revoke/", views.revoke_invite, name="revoke_invite"),
+    path("delivery/", views.delivery, name="delivery"),
+    path("account/", views.account, name="account"),
     path("login/", views.login_view, name="login"),
     path("logout/", LogoutView.as_view(), name="logout"),
 ]

@@ -2,7 +2,11 @@
 {% block title %}Editions · BiteSIze{% endblock %}
 {% block content %}
 <h1>Today's edition</h1>
-<p>Editions go to <strong>{{ user.profile.kindle_email|default:"no Kindle address yet" }}</strong>.</p>
+{% if user.profile.kindle_email %}
+  <p>Editions go to <strong>{{ user.profile.kindle_email }}</strong>.</p>
+{% else %}
+  <p class="notice">No Kindle address yet. <a href="{% url 'delivery' %}">Add your Kindle address</a></p>
+{% endif %}
 
 {% with edition=queue.edition %}
 {% if edition %}
