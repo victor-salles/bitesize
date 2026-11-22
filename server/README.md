@@ -60,9 +60,15 @@ The `accounts` app handles sign-up (name, Send-to-Kindle address, 4–6 digit PI
 
 Sign-up is invite-only. Staff create single-use links at `/invites/` (or in the admin); a link works at `/signup/<token>/` until it is used, revoked or expired. Every other sign-up URL shows the same "you need an invite" page, without saying why. The invite is spent in the same transaction that creates the user.
 
-There is no self-service PIN reset. Staff reset a PIN in the admin (Users → the user → "Reset password"): for non-staff users it takes a 4–6 digit PIN; staff accounts keep Django's password validators. The PIN is stored as Django's password hash; trivial PINs (`1234`, `0000`, `9876`) are refused. Names are unique and matched case-insensitively. Pages extend `server/templates/base.html`: plain forms, no JavaScript, large tap targets for the Kindle browser.
+There is no self-service PIN reset. Staff reset a PIN in the admin (Users → the user → "Reset password"): for non-staff users it takes a 4–6 digit PIN; staff accounts keep Django's password validators. The PIN is stored as Django's password hash; trivial PINs (`1234`, `0000`, `9876`) are refused. Names are unique and matched case-insensitively.
 
 Failed logins are counted per account and per client IP in Django's cache. The cache is `DatabaseCache` in the SQLite file, not the default in-process `LocMemCache`: gunicorn runs two workers, and per-process counters would let an attacker get double the attempts and lose them on every restart. A database cache needs no extra service on the droplet. Migration `accounts/0001` creates the table, so `migrate` stays the only deploy step. The client IP is the rightmost `X-Forwarded-For` entry, the one Dokku's nginx writes.
+
+## Interface
+
+Every page extends `server/templates/base.html`: plain forms, no JavaScript, large tap targets for the Kindle browser. Logged-in readers get four tabs, Sources (`/sources/`), Delivery (`/delivery/`: Kindle address, delivery time, time zone, edition language), Editions (`/editions/`) and Account (`/account/`: name, log out, Invites for staff). `core.context_processors.tabs` builds them and marks the current one with `aria-current="page"`. Login, sign-up and the 500 page use the same layout without tabs.
+
+Styles live in one file, `server/core/static/bitesize/site.css`. The design tokens (type scale, spacing, borders, tap target) are CSS custom properties in its `:root`. Each rule also states the plain value first, so an old WebKit without custom properties still gets the layout; change both when a token changes. No grid, flex gap or `position: sticky`.
 
 ## AI and the article cache
 

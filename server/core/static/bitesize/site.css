@@ -1,0 +1,174 @@
+/*
+BiteSIze: monochrome layout for e-ink screens and desktop browsers.
+
+Design tokens live in :root. The final values come from the design (#58):
+change them here and every page follows.
+
+Old WebKit (the Kindle's experimental browser) may not know custom properties,
+so each rule that uses a token first states the same value plainly. A browser
+that understands var() takes the second declaration; one that does not keeps
+the first. Keep the pairs in step when a token changes.
+
+No grid, no flex gap, no position: sticky: the layout is blocks, inline-blocks
+and one table-style row for the tabs.
+*/
+
+:root {
+  /* Colour: ink on paper, nothing in between. */
+  --ink: #000;
+  --paper: #fff;
+
+  /* Type */
+  --font-reading: Georgia, "Times New Roman", Times, serif;
+  --text-small: 1rem;
+  --text-body: 1.25rem;
+  --text-h2: 1.5rem;
+  --text-h1: 2rem;
+  --line-height: 1.5;
+
+  /* Spacing scale */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 1rem;
+  --space-4: 1.5rem;
+  --space-5: 2rem;
+
+  /* Borders */
+  --border-thin: 1px solid #000;
+  --border-thick: 2px solid #000;
+  --border-heavy: 4px solid #000;
+
+  /* Layout */
+  --measure: 40rem;
+  --tap-target: 3rem;
+}
+
+/* ── Page ─────────────────────────────────────────────────────────────── */
+
+html { background: #fff; background: var(--paper); }
+
+body {
+  margin: 0 auto;
+  max-width: 40rem; max-width: var(--measure);
+  padding: 1rem; padding: var(--space-3);
+  font-family: Georgia, "Times New Roman", Times, serif; font-family: var(--font-reading);
+  font-size: 1.25rem; font-size: var(--text-body);
+  line-height: 1.5; line-height: var(--line-height);
+  color: #000; color: var(--ink);
+  background: #fff; background: var(--paper);
+  -webkit-text-size-adjust: 100%;
+}
+
+h1 { font-size: 2rem; font-size: var(--text-h1); line-height: 1.2; margin: 1.5rem 0 1rem; margin: var(--space-4) 0 var(--space-3); }
+h2 { font-size: 1.5rem; font-size: var(--text-h2); line-height: 1.25; margin: 2rem 0 0.5rem; margin: var(--space-5) 0 var(--space-2); }
+h3 { font-size: 1.25rem; font-size: var(--text-body); margin: 1.5rem 0 0.5rem; margin: var(--space-4) 0 var(--space-2); }
+
+a { color: #000; color: var(--ink); text-decoration: underline; }
+small, .helptext { font-size: 1rem; font-size: var(--text-small); }
+.helptext { display: block; }
+code { font-size: 1rem; font-size: var(--text-small); }
+
+/* ── Header and tabs ──────────────────────────────────────────────────── */
+
+.site-header { margin-bottom: 1rem; margin-bottom: var(--space-3); }
+.site-header:after { content: ""; display: block; clear: both; }
+.brand { float: left; display: inline-block; padding: 0.5rem 0; padding: var(--space-2) 0; font-size: 1.5rem; font-size: var(--text-h2); font-weight: bold; text-decoration: none; }
+.header-link { float: right; display: inline-block; padding: 0.5rem 0; padding: var(--space-2) 0; line-height: 2rem; }
+
+.tabs ul { display: table; table-layout: fixed; width: 100%; margin: 0; padding: 0; list-style: none; border-collapse: collapse; }
+.tabs li { display: table-cell; text-align: center; border: 2px solid #000; border: var(--border-thick); }
+.tabs a {
+  display: block;
+  min-height: 3rem; min-height: var(--tap-target);
+  padding: 0.5rem 0.25rem; padding: var(--space-2) var(--space-1);
+  box-sizing: border-box;
+  line-height: 2rem;
+  font-size: 1rem; font-size: var(--text-small);
+  font-weight: bold;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The current tab is drawn inverted: readable on e-ink without colour. */
+.tabs a[aria-current="page"] { background: #000; background: var(--ink); color: #fff; color: var(--paper); }
+
+/* ── Messages and notices ─────────────────────────────────────────────── */
+
+.messages { margin: 1rem 0; margin: var(--space-3) 0; padding: 0; list-style: none; }
+.messages li, .notice {
+  margin: 1rem 0; margin: var(--space-3) 0;
+  padding: 0.5rem 1rem; padding: var(--space-2) var(--space-3);
+  border: 2px solid #000; border: var(--border-thick);
+}
+.notice { border-left: 4px solid #000; border-left: var(--border-heavy); font-weight: bold; }
+.notice a { font-weight: bold; }
+
+/* ── Forms ────────────────────────────────────────────────────────────── */
+
+label { display: block; margin-top: 1rem; margin-top: var(--space-3); font-weight: bold; }
+input, select, textarea, button {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 3rem; min-height: var(--tap-target);
+  padding: 0.5rem; padding: var(--space-2);
+  font: inherit;
+  color: #000; color: var(--ink);
+  background: #fff; background: var(--paper);
+  border: 2px solid #000; border: var(--border-thick);
+  border-radius: 0;
+}
+input[type="hidden"] { display: none; }
+button { margin-top: 1.5rem; margin-top: var(--space-4); font-weight: bold; cursor: pointer; }
+button[type="submit"] { background: #000; background: var(--ink); color: #fff; color: var(--paper); }
+.errorlist {
+  margin: 0.5rem 0; margin: var(--space-2) 0;
+  padding: 0.5rem; padding: var(--space-2);
+  border: 2px solid #000; border: var(--border-thick);
+  list-style: none;
+  font-weight: bold;
+}
+
+/* Side-by-side secondary actions, such as Turn off and Remove. */
+.actions { margin-top: 0.5rem; margin-top: var(--space-2); }
+.actions form { display: inline-block; margin: 0 0.5rem 0.5rem 0; margin: 0 var(--space-2) var(--space-2) 0; }
+.actions button, .inline-button { width: auto; min-width: 8rem; margin: 0; padding: 0.5rem 1rem; padding: var(--space-2) var(--space-3); }
+.actions button { background: #fff; background: var(--paper); color: #000; color: var(--ink); }
+
+/* ── Lists and tables ─────────────────────────────────────────────────── */
+
+.items { margin: 0; padding: 0; list-style: none; }
+.items > li { padding: 1rem 0; padding: var(--space-3) 0; border-top: 2px solid #000; border-top: var(--border-thick); }
+.items > li:last-child { border-bottom: 2px solid #000; border-bottom: var(--border-thick); }
+.item-name { font-weight: bold; }
+.item-detail { display: block; font-size: 1rem; font-size: var(--text-small); word-wrap: break-word; overflow-wrap: break-word; }
+.tag {
+  display: inline-block;
+  padding: 0 0.5rem; padding: 0 var(--space-2);
+  border: 2px solid #000; border: var(--border-thick);
+  font-size: 1rem; font-size: var(--text-small);
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.tag-strong { background: #000; background: var(--ink); color: #fff; color: var(--paper); }
+
+table { border-collapse: collapse; width: 100%; }
+th, td {
+  padding: 0.5rem; padding: var(--space-2);
+  border-bottom: 1px solid #000; border-bottom: var(--border-thin);
+  text-align: left;
+  vertical-align: top;
+  word-wrap: break-word;
+}
+th { border-bottom: 2px solid #000; border-bottom: var(--border-thick); }
+
+/* ── Invites (staff) ──────────────────────────────────────────────────── */
+
+.invite-link {
+  display: block;
+  margin-top: 0.5rem; margin-top: var(--space-2);
+  padding: 0.5rem; padding: var(--space-2);
+  border: 1px solid #000; border: var(--border-thin);
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+}

@@ -1,19 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Invites · BiteSIze{% endblock %}
 {% block content %}
-<style>
-  .invites { list-style: none; margin: 0; padding: 0; }
-  .invite { border-top: 2px solid #000; padding: 1rem 0 1.25rem; }
-  .invite:last-child { border-bottom: 2px solid #000; }
-  .invite-head { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: baseline; justify-content: space-between; }
-  .invite-name { margin: 0; font-size: 1.25rem; }
-  .invite-status { font-size: 0.85rem; font-weight: bold; letter-spacing: 0.08em; text-transform: uppercase; border: 2px solid #000; padding: 0.1rem 0.5rem; }
-  .invite-status.pending { background: #000; color: #fff; }
-  .invite-dates { margin: 0.25rem 0 0; font-size: 1rem; }
-  .invite-link { display: block; margin-top: 0.75rem; padding: 0.75rem; border: 1px solid #000; font-size: 0.9rem; line-height: 1.4; overflow-wrap: anywhere; }
-  .invite form button { width: auto; min-width: 8rem; margin-top: 0.75rem; }
-</style>
-
 <h1>Invites</h1>
 <form method="post" action="{% url 'invites' %}">
   {% csrf_token %}
@@ -23,21 +10,21 @@
 
 <h2>Recent invites</h2>
 {% if invites %}
-<ul class="invites">
+<ul class="items">
   {% for invite in invites %}
-  <li class="invite">
-    <div class="invite-head">
-      <h3 class="invite-name">{{ invite.note|default:"No name" }}</h3>
-      <span class="invite-status {{ invite.status }}">{{ invite.status }}</span>
-    </div>
-    <p class="invite-dates">
+  <li>
+    <span class="item-name">{{ invite.note|default:"No name" }}</span>
+    <span class="tag{% if invite.status == "pending" %} tag-strong{% endif %}">{{ invite.status }}</span>
+    <p class="item-detail">
       Created {{ invite.created_at|date:"j M Y" }}
       {% if invite.status == "pending" %}· expires {{ invite.expires_at|date:"j M Y" }}
       {% elif invite.status == "used" and invite.used_by %}· used by {{ invite.used_by.username }}{% endif %}
     </p>
     {% if invite.status == "pending" %}
       <code class="invite-link">{{ invite.link }}</code>
-      <form method="post" action="{% url 'revoke_invite' invite.pk %}">{% csrf_token %}<button type="submit">Revoke</button></form>
+      <div class="actions">
+        <form method="post" action="{% url 'revoke_invite' invite.pk %}">{% csrf_token %}<button type="submit">Revoke</button></form>
+      </div>
     {% endif %}
   </li>
   {% endfor %}

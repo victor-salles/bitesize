@@ -66,7 +66,7 @@ def test_signup_logs_the_user_in(client, signup_url):
     response = client.get(reverse("home"), follow=True)
 
     assert response.status_code == 200
-    assert b"Ana" in response.content
+    assert response.context["user"].username == "Ana"
 
 
 def test_signup_lowercases_the_kindle_email(client, signup_url):
@@ -239,12 +239,19 @@ def test_authenticated_users_are_sent_home(client, ana, page):
     assert response["Location"] == reverse("home")
 
 
-def test_home_shows_the_kindle_email_and_a_logout_form(client, ana):
+def test_home_shows_the_kindle_email(client, ana):
     client.force_login(ana)
 
     response = client.get(reverse("home"), follow=True)
 
     assert b"ana_42@kindle.com" in response.content
+
+
+def test_account_tab_has_the_logout_form(client, ana):
+    client.force_login(ana)
+
+    response = client.get(reverse("account"))
+
     assert f'action="{reverse("logout")}"'.encode() in response.content
 
 
