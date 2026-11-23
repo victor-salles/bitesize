@@ -25,7 +25,7 @@ from edition_data import EditionMeta, topic_mention_counts
 from epub import generate_epub
 from feed import fetch_article_content, fetch_feed, filter_headline_only
 from safe_fetch import FetchError
-from gemini import generate_global_cover, generate_section_cover, process_articles, spread_tied_scores
+from gemini import OPTIONAL_AI_FIELDS, generate_global_cover, generate_section_cover, process_articles, spread_tied_scores
 from magazine_layers import article_rank_sort_key
 from paywall import log_summary, reset_stats
 from settings_store import Settings
@@ -45,8 +45,10 @@ class ArticleCache(Protocol):
     """Per-article AI output (summary, score, tags) kept across editions.
 
     A result is {"skip": True} for an ad the AI dropped, otherwise
-    {"summary", "relevance", "tipo", "temas"}. get() returns None on a miss
-    or when the cached copy is stale.
+    {"summary", "relevance", "tipo", "temas"} plus any of
+    gemini.OPTIONAL_AI_FIELDS the AI wrote (rows from before a field existed
+    lack it; pages fall back). get() returns None on a miss or when the
+    cached copy is stale.
     """
 
     def get(self, art: dict, language: str) -> Optional[dict]: ...
@@ -137,6 +139,7 @@ def _process_articles(articles: list[dict], cache: Optional[ArticleCache]) -> li
         elif not cached.get("skip"):
             hit = {**art, "summary": cached.get("summary", ""), "relevance": cached["relevance"],
                    "relevance_source": "ai"}
+            hit.update({key: cached[key] for key in OPTIONAL_AI_FIELDS if cached.get(key)})
             hits.append(normalize_tags(hit, cached))
 
     processed = process_articles(misses) if misses else []
@@ -154,6 +157,7 @@ def _process_articles(articles: list[dict], cache: Optional[ArticleCache]) -> li
                 "relevance": out["relevance"],
                 "tipo": out.get("tipo"),
                 "temas": out.get("temas", []),
+                **{key: out[key] for key in OPTIONAL_AI_FIELDS if out.get(key)},
             })
 
     if hits:

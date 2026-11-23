@@ -7,6 +7,7 @@ import hashlib
 from typing import Optional
 
 from core.models import Article
+from gemini import OPTIONAL_AI_FIELDS
 
 
 def _text(art: dict) -> str:
@@ -33,6 +34,8 @@ class DatabaseArticleCache:
             "relevance": int(row.score),
             "tipo": row.tags.get("tipo"),
             "temas": list(row.tags.get("temas", [])),
+            # Rows are shared across users and outlive prompt changes: a missing field stays missing.
+            **{key: row.tags[key] for key in OPTIONAL_AI_FIELDS if row.tags.get(key)},
         }
 
     def put(self, art: dict, language: str, result: dict) -> None:
@@ -48,6 +51,10 @@ class DatabaseArticleCache:
                 "skipped": skipped,
                 "summary": "" if skipped else result.get("summary", ""),
                 "score": None if skipped else result.get("relevance"),
-                "tags": {} if skipped else {"tipo": result.get("tipo"), "temas": list(result.get("temas", []))},
+                "tags": {} if skipped else {
+                    "tipo": result.get("tipo"),
+                    "temas": list(result.get("temas", [])),
+                    **{key: result[key] for key in OPTIONAL_AI_FIELDS if result.get(key)},
+                },
             },
         )

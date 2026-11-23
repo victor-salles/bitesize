@@ -333,3 +333,26 @@ def test_build_edition_skips_an_article_on_an_internal_address(tmp_path, fake_ne
     pages = b"".join(item.get_content() for item in book.get_items())
     assert b"Rates hold steady" in pages
     assert b"Cloud metadata" not in pages
+
+
+def test_article_cache_carries_the_short_title_and_tolerates_rows_without_it(monkeypatch):
+    cache = MemoryCache()
+    cache.rows[("https://example.com/old", "en")] = {
+        "summary": "Old row.", "relevance": 50, "tipo": "resumo", "temas": [],
+    }
+    fresh = {"url": "https://example.com/new", "title": "New story", "content": BODY}
+
+    def fake_process(articles):
+        return [{**art, "summary": "S.", "relevance": 70, "relevance_source": "ai", "tipo": "resumo",
+                 "temas": [], "short_title": "New"} for art in articles]
+
+    monkeypatch.setattr(pipeline, "process_articles", fake_process)
+    with config.use_settings(Settings(ai_language="en")):
+        out = pipeline._process_articles(
+            [{"url": "https://example.com/old", "title": "Old story", "content": BODY}, fresh], cache
+        )
+
+    by_url = {art["url"]: art for art in out}
+    assert "short_title" not in by_url["https://example.com/old"]
+    assert by_url["https://example.com/new"]["short_title"] == "New"
+    assert cache.rows[("https://example.com/new", "en")]["short_title"] == "New"
