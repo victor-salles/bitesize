@@ -1,10 +1,9 @@
-import html
 import re
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import urlparse
 
 from ebooklib import epub
+
 
 from ai_locale import ai_language_code, epub_label, format_digest_date, format_tag_line
 from config import get_settings
@@ -12,6 +11,7 @@ from cover_art import render_cover
 from cover_data import build_cover_data
 from edition_data import EditionMeta, StoryNumbers
 from gemini import article_relevance, relevance_display
+from xhtml import escape, safe_href, slugify, xhtml_page
 from magazine_layers import (
     find_hero_article,
     lead_for_section,
@@ -326,42 +326,6 @@ a.top-pick-card:first-of-type {
 """
 
 
-def _e(s: str) -> str:
-    return html.escape(s or "")
-
-
-_ALLOWED_SCHEMES = {"http", "https"}
-
-
-def safe_href(url: str) -> str:
-    """Return HTML-escaped http(s) URL, or empty string if unsafe."""
-    url = (url or "").strip()
-    parsed = urlparse(url)
-    if parsed.scheme not in _ALLOWED_SCHEMES or not parsed.netloc:
-        return ""
-    return _e(url)
-
-
-def _slugify(text: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")
-
-
-def _xhtml_wrap(title: str, body: str) -> bytes:
-    return (
-        "<?xml version='1.0' encoding='utf-8'?>"
-        "<!DOCTYPE html>"
-        f'<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="{ai_language_code()}">'
-        "<head>"
-        f"  <title>{_e(title)}</title>"
-        '  <meta charset="utf-8"/>'
-        '  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>'
-        '  <link href="style.css" rel="stylesheet" type="text/css"/>'
-        "</head>"
-        f"<body>{body}</body>"
-        "</html>"
-    ).encode("utf-8")
-
-
 def _normalize_text(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "").strip().lower())
 
@@ -451,17 +415,17 @@ def _fallback_global_cover(sections: dict[str, list]) -> dict:
 
 def _cover_highlight_xhtml(h: dict) -> str:
     """One section desk note on the opening spread."""
-    sec = _e(h.get("section", ""))
-    source = _e(h.get("source", ""))
+    sec = escape(h.get("section", ""))
+    source = escape(h.get("source", ""))
     hl_raw = (h.get("headline") or "").strip()
-    story = _e(h.get("story", ""))
+    story = escape(h.get("story", ""))
     meta = f"{sec} · {source}" if source else sec
     parts = [
         '<div class="lead-story">',
         f'<p class="article-section">{meta}</p>',
     ]
     if hl_raw:
-        parts.append(f"<h4>{_e(hl_raw)}</h4>")
+        parts.append(f"<h4>{escape(hl_raw)}</h4>")
     parts.append(f"<p>{story}</p></div>")
     return "".join(parts)
 
@@ -469,7 +433,7 @@ def _cover_highlight_xhtml(h: dict) -> str:
 def _article_href(category: str, art: dict, sections: dict[str, list]) -> str | None:
     """Return spine filename for an article (must match generate_epub ordering)."""
     arts = sections.get(category) or []
-    slug = _slugify(category)
+    slug = slugify(category)
     url = (art.get("url") or "").strip()
     title = (art.get("title") or "").strip()
     for i, a in enumerate(arts, start=1):
@@ -491,7 +455,7 @@ def _top_picks_xhtml(
         return ""
     parts: list[str] = [
         '<section class="top-picks">',
-        f'<h2 class="top-picks-heading">{_e(epub_label("top_stories"))}</h2>',
+        f'<h2 class="top-picks-heading">{escape(epub_label("top_stories"))}</h2>',
     ]
     for score, cat, art in picks:
         href = _article_href(cat, art, sections)
@@ -504,11 +468,11 @@ def _top_picks_xhtml(
         source = (art.get("source") or "").strip()
         meta = " — ".join(p for p in (cat, source, relevance_display(art)) if p)
         parts.append(
-            f'<a class="top-pick-card" href="{_e(href)}">'
+            f'<a class="top-pick-card" href="{escape(href)}">'
             f'<div>'
-            f'<p class="top-pick-meta">{_e(meta)}</p>'
-            f'<h3 class="top-pick-title">{_e(art.get("title", ""))}</h3>'
-            f'<p class="top-pick-blurb">{_e(blurb)}</p>'
+            f'<p class="top-pick-meta">{escape(meta)}</p>'
+            f'<h3 class="top-pick-title">{escape(art.get("title", ""))}</h3>'
+            f'<p class="top-pick-blurb">{escape(blurb)}</p>'
             f"</div>"
             f"</a>"
         )
@@ -524,7 +488,7 @@ def _body_paragraphs(text: str, drop_cap: bool = True) -> str:
     parts = []
     for i, p in enumerate(paragraphs):
         cls = ' class="lede"' if drop_cap and i == 0 else ""
-        parts.append(f"<p{cls}>{_e(p)}</p>")
+        parts.append(f"<p{cls}>{escape(p)}</p>")
     return "".join(parts)
 
 
@@ -541,16 +505,16 @@ def _article_body_html(art: dict) -> str:
         rel = relevance_display(art)
         parts.append(
             f'<div class="summary">'
-            f'<p class="summary-label">{_e(epub_label("summary"))}</p>'
-            f'<p class="summary-meta-line">{_e(epub_label("relevance_score"))}: {rel}/10</p>'
+            f'<p class="summary-label">{escape(epub_label("summary"))}</p>'
+            f'<p class="summary-meta-line">{escape(epub_label("relevance_score"))}: {rel}/10</p>'
         )
         if tag_line:
-            parts.append(f'<p class="summary-meta-line">{_e(tag_line)}</p>')
-        parts.append(f"<p>{_e(summary)}</p>" f"</div>")
+            parts.append(f'<p class="summary-meta-line">{escape(tag_line)}</p>')
+        parts.append(f"<p>{escape(summary)}</p>" f"</div>")
     elif tag_line:
         parts.append(
             f'<div class="summary">'
-            f'<p class="summary-meta-line">{_e(tag_line)}</p>'
+            f'<p class="summary-meta-line">{escape(tag_line)}</p>'
             f"</div>"
         )
 
@@ -577,17 +541,17 @@ def _global_cover_xhtml(cover_data: dict, sections: dict[str, list], now: dateti
     desk_html = ""
     if desk_highlights:
         desk_html = (
-            f'<h2 class="top-picks-heading">{_e(epub_label("by_section"))}</h2>'
+            f'<h2 class="top-picks-heading">{escape(epub_label("by_section"))}</h2>'
             + "".join(_cover_highlight_xhtml(h) for h in desk_highlights)
         )
 
     if cover_data:
-        editorial = _e(cover_data.get("editorial", ""))
-        kicker = f"{_e(epub_label('digest_title'))} &middot; {_e(date_str)} &middot; {total} {epub_label('articles')}"
+        editorial = escape(cover_data.get("editorial", ""))
+        kicker = f"{escape(epub_label('digest_title'))} &middot; {escape(date_str)} &middot; {total} {epub_label('articles')}"
         body = (
             f'<header class="article-header global-cover-header">'
             f'<p class="article-section">{kicker}</p>'
-            f'<h1 class="article-title">{_e(epub_label("edition_overview"))}</h1>'
+            f'<h1 class="article-title">{escape(epub_label("edition_overview"))}</h1>'
             f'<p class="cover-lead">{editorial}</p>'
             f"</header>"
             f"{top_picks_html}"
@@ -595,19 +559,19 @@ def _global_cover_xhtml(cover_data: dict, sections: dict[str, list], now: dateti
             f'<div class="cover-highlights">{desk_html}</div>'
         )
     else:
-        kicker = f"{_e(epub_label('digest_title'))} &middot; {_e(date_str)} &middot; {total} {epub_label('articles')}"
+        kicker = f"{escape(epub_label('digest_title'))} &middot; {escape(date_str)} &middot; {total} {epub_label('articles')}"
         body = (
             f'<header class="article-header global-cover-header">'
             f'<p class="article-section">{kicker}</p>'
-            f'<h1 class="article-title">{_e(epub_label("edition_overview"))}</h1>'
-            f'<p class="cover-lead">{_e(epub_label("sections_today"))}</p>'
+            f'<h1 class="article-title">{escape(epub_label("edition_overview"))}</h1>'
+            f'<p class="cover-lead">{escape(epub_label("sections_today"))}</p>'
             f"</header>"
             f"{top_picks_html}"
             f'<hr class="cover-rule" />'
             f'<div class="cover-highlights">{desk_html}</div>'
         )
 
-    return _xhtml_wrap(epub_label("digest_title"), body)
+    return xhtml_page(epub_label("digest_title"), body)
 
 
 def _section_cover_xhtml(
@@ -620,18 +584,18 @@ def _section_cover_xhtml(
         cover_data = _fallback_section_cover(category, articles, hero=hero)
 
     if cover_data:
-        headline  = _e(cover_data.get("headline", ""))
-        editorial = _e(cover_data.get("editorial", ""))
+        headline  = escape(cover_data.get("headline", ""))
+        editorial = escape(cover_data.get("editorial", ""))
         top_stories_html = "".join(
             f'<div class="lead-story">'
-            f'<h4>{_e(s.get("title",""))}</h4>'
-            f'<p>{_e(s.get("one_liner",""))}</p>'
+            f'<h4>{escape(s.get("title",""))}</h4>'
+            f'<p>{escape(s.get("one_liner",""))}</p>'
             f"</div>"
             for s in cover_data.get("top_stories", [])
         )
         body = (
             f'<div class="cat-cover">'
-            f'<p class="cat-title">{_e(category)}</p>'
+            f'<p class="cat-title">{escape(category)}</p>'
             f'<h2 class="cat-headline">{headline}</h2>'
             f'<p class="editorial">{editorial}</p>'
             f"{top_stories_html}"
@@ -640,11 +604,11 @@ def _section_cover_xhtml(
     else:
         body = (
             f'<div class="cat-cover">'
-            f'<p class="cat-title">{_e(category)}</p>'
+            f'<p class="cat-title">{escape(category)}</p>'
             f"</div>"
         )
 
-    return _xhtml_wrap(category, body)
+    return xhtml_page(category, body)
 
 
 def _index_page_filename(slug: str, page_num: int) -> str:
@@ -663,23 +627,23 @@ def _section_index_entries_html(
         story_num = start_num + offset
         art_slug = f"{slug}_{story_num:02d}"
         blurb = _article_blurb(art)
-        blurb_tag = f'<p class="index-blurb">{_e(blurb)}</p>' if blurb else ""
+        blurb_tag = f'<p class="index-blurb">{escape(blurb)}</p>' if blurb else ""
         source = (art.get("source") or "").strip()
         title = art.get("title", "")
         index_title = f"{source} — {title}" if source else title
         score_line = (
-            f'<p class="index-relevance">{_e(epub_label("relevance"))} '
+            f'<p class="index-relevance">{escape(epub_label("relevance"))} '
             f"{relevance_display(art)}/10</p>"
         )
         meta_line = (
-            f'<p class="index-meta">{_e(art["published"])}</p>' if art.get("published") else ""
+            f'<p class="index-meta">{escape(art["published"])}</p>' if art.get("published") else ""
         )
         entries.append(
             f'<a class="index-entry-link" href="article_{art_slug}.xhtml">'
             f'<div class="index-entry">'
             f'<p class="index-num">Story {story_num}</p>'
             f"{score_line}"
-            f'<h2 class="index-title">{_e(index_title)}</h2>'
+            f'<h2 class="index-title">{escape(index_title)}</h2>'
             f"{meta_line}"
             f"{blurb_tag}"
             f"</div>"
@@ -721,7 +685,7 @@ def _section_index_page_xhtml(
         nav_html = f'<p class="index-page-nav">{" &nbsp;|&nbsp; ".join(nav_parts)}</p>'
 
     body = (
-        f"<h1>{_e(category)}</h1>"
+        f"<h1>{escape(category)}</h1>"
         f'<p class="section-index-intro">{intro}</p>'
         f'<div class="section-index">{_section_index_entries_html(page_articles, slug, start_num)}</div>'
         f"{nav_html}"
@@ -732,23 +696,23 @@ def _section_index_page_xhtml(
         if total_pages == 1
         else f"{category} — {contents} ({page_num}/{total_pages})"
     )
-    return _xhtml_wrap(page_title, body)
+    return xhtml_page(page_title, body)
 
 
 def _article_xhtml(category: str, art: dict, index: int, total: int) -> bytes:
     pub_tag = f" &middot; {art['published']}" if art.get("published") else ""
     body = (
         f'<header class="article-header">'
-        f'<p class="article-section">{_e(category)} &middot; {index} {epub_label("article_of")} {total}</p>'
-        f'<h1 class="article-title">{_e(art["title"])}</h1>'
-        f'<p class="meta">{_e(art["source"])}{pub_tag}</p>'
+        f'<p class="article-section">{escape(category)} &middot; {index} {epub_label("article_of")} {total}</p>'
+        f'<h1 class="article-title">{escape(art["title"])}</h1>'
+        f'<p class="meta">{escape(art["source"])}{pub_tag}</p>'
         f"</header>"
         f"{_article_body_html(art)}"
     )
     href = safe_href(art.get("url", ""))
     if href:
-        body += f'<p class="read-more"><a href="{href}">{_e(epub_label("read_full"))}</a></p>'
-    return _xhtml_wrap(art["title"], body)
+        body += f'<p class="read-more"><a href="{href}">{escape(epub_label("read_full"))}</a></p>'
+    return xhtml_page(art["title"], body)
 
 
 def generate_epub(
@@ -805,7 +769,7 @@ def generate_epub(
         if not articles:
             continue
 
-        slug = _slugify(category)
+        slug = slugify(category)
         section_links: list = []
 
         sec_cover_ch = epub.EpubHtml(
