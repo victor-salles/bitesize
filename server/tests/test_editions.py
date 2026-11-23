@@ -367,3 +367,37 @@ def test_edition_config_sends_ai_through_the_server_gemini_client(ana, settings,
     assert config.ai.call("Summarise", "article text") == "summary"
     assert requests == [("gemini-test", "article text")]
     assert isinstance(config.article_cache, DatabaseArticleCache)
+
+
+# ── edition history ──────────────────────────────────────────────────────────
+
+def _built(user, day, **fields):
+    return Edition.objects.create(user=user, edition_date=day, status=Edition.Status.SUCCEEDED, **fields)
+
+
+def test_first_edition_has_number_one_and_no_previous_topics(ana):
+    config = edition_config(Edition.objects.create(user=ana, edition_date=DAY))
+
+    assert config.edition_number == 1
+    assert config.previous_topic_counts is None
+
+
+def test_edition_config_takes_the_latest_earlier_built_edition_as_yesterday(ana):
+    _built(ana, DAY - timedelta(days=3), topic_counts={"clima": 9})
+    _built(ana, DAY - timedelta(days=2), topic_counts={"política": 2})
+    Edition.objects.create(user=ana, edition_date=DAY - timedelta(days=1), status=Edition.Status.FAILED)
+    _built(make_user("bia"), DAY - timedelta(days=1), topic_counts={"esportes": 5})
+
+    config = edition_config(Edition.objects.create(user=ana, edition_date=DAY))
+
+    assert config.edition_number == 3
+    assert config.previous_topic_counts == {"política": 2}
+
+
+def test_a_previous_edition_built_before_topic_counts_existed_hides_the_trend(ana):
+    _built(ana, DAY - timedelta(days=1))
+
+    config = edition_config(Edition.objects.create(user=ana, edition_date=DAY))
+
+    assert config.edition_number == 2
+    assert config.previous_topic_counts is None

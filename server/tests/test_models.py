@@ -204,6 +204,7 @@ def test_record_result_copies_the_pipeline_stats(user):
         filtered_count=10,
         article_count=18,
         section_counts={"World": 10, "Tech": 8},
+        topic_counts={"política": 3, "economia": 1},
     )
 
     edition.record_result(result)
@@ -216,6 +217,7 @@ def test_record_result_copies_the_pipeline_stats(user):
     assert edition.filtered_count == 10
     assert edition.article_count == 18
     assert edition.section_counts == {"World": 10, "Tech": 8}
+    assert edition.topic_counts == {"política": 3, "economia": 1}
 
 
 @pytest.mark.django_db

@@ -239,6 +239,8 @@ def edition_config(edition: Edition):
     from pipeline import EditionConfig
 
     profile = edition.user.profile
+    earlier = edition.earlier_built()
+    previous = earlier.only("topic_counts").first()
     return EditionConfig(
         sources=Source.objects.edition_sources(edition.user),
         output_dir=edition_dir(edition),
@@ -246,6 +248,9 @@ def edition_config(edition: Edition):
         now=timezone.localtime(timezone.now(), ZoneInfo(profile.timezone)),
         ai=get_server_ai_client(),
         article_cache=get_article_cache(),
+        edition_number=earlier.count() + 1,
+        # Empty for an edition built before topic counts were stored: no trend beats a wrong one.
+        previous_topic_counts=(previous.topic_counts or None) if previous else None,
     )
 
 
