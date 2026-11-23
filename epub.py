@@ -10,13 +10,13 @@ from config import get_settings
 from cover_art import render_cover
 from cover_data import build_cover_data
 from edition_data import EditionMeta, StoryNumbers
+from epub_images import book_images
+from epub_pages import CONTENTS_FILE, PAGES_CSS, BookLayout, contents_body
 from gemini import article_relevance, relevance_display
 from xhtml import escape, safe_href, slugify, xhtml_page
 from magazine_layers import (
     find_hero_article,
     lead_for_section,
-    ranked_excluding_hero,
-    section_desk_highlights,
 )
 
 _CSS = """
@@ -63,47 +63,7 @@ h4 { font-size: 1em; margin: 0 0 0.2em 0; }
 
 p { margin: 0 0 0.75em 0; text-align: justify; }
 
-a { color: #1a5276; text-decoration: none; }
-
-/* ── Global cover (matches article rhythm: kicker → headline → lead → blocks) ─ */
-.global-cover-header { margin-bottom: 0.2em; }
-.cover-lead {
-  font-size: 1.02em;
-  color: #333;
-  line-height: 1.7;
-  margin: 0 0 0.5em 0;
-  text-align: left;
-}
-.cover-rule {
-  border: none;
-  border-top: 0.08em solid #bbb;
-  margin: 1em 0 1.1em 0;
-}
-.cover-highlights { margin-top: 0.2em; }
-.cover-highlights .lead-story {
-  margin-bottom: 1em;
-  padding: 0.65em 0 0.85em 0;
-}
-.cover-highlights .lead-story:last-child { margin-bottom: 0; }
-.cover-highlights .lead-story .article-section { margin-bottom: 0.45em; }
-.cover-highlights .lead-story h4 {
-  font-size: 1em;
-  font-weight: bold;
-  margin: 0 0 0.35em 0;
-  line-height: 1.3;
-  text-align: left;
-}
-.cover-highlights .lead-story p {
-  font-size: 0.95em;
-  color: #444;
-  line-height: 1.6;
-  margin: 0;
-  text-align: left;
-}
-.cover-highlights .lead-story:first-child {
-  border-top: none;
-  padding-top: 0;
-}
+a { color: #111111; text-decoration: none; }
 
 /* ── Section cover pages ──────────────────────────────────────────────────── */
 .cat-cover { text-align: center; margin-top: 12%; }
@@ -191,7 +151,7 @@ a.index-entry-link .index-meta { color: #777; }
   border-top: 0.06em solid #ccc;
   text-align: center;
 }
-.index-page-nav a { color: #1a5276; }
+.index-page-nav a { color: #111111; }
 
 /* ── Individual articles ──────────────────────────────────────────────────── */
 .article-header { margin-bottom: 1em; }
@@ -242,51 +202,9 @@ a.index-entry-link .index-meta { color: #777; }
 .index-relevance {
   font-size: 0.68em;
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  color: #1b6b4d;
+  color: #595959;
   margin: 0 0 0.35em 0;
   letter-spacing: 0.03em;
-}
-.top-picks { margin: 0.15em 0 0.85em 0; }
-.top-picks-heading {
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 0.72em;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: #666;
-  margin: 0 0 0.55em 0;
-}
-a.top-pick-card {
-  display: block;
-  text-decoration: none;
-  color: inherit;
-  padding: 0.55em 0 0.75em 0;
-  border-top: 0.06em solid #ccc;
-}
-a.top-pick-card:first-of-type {
-  border-top: none;
-  padding-top: 0;
-}
-.top-pick-meta {
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 0.68em;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #777;
-  margin: 0 0 0.25em 0;
-}
-.top-pick-title {
-  font-size: 1.02em;
-  font-weight: bold;
-  line-height: 1.25;
-  margin: 0 0 0.3em 0;
-  text-align: left;
-}
-.top-pick-blurb {
-  font-size: 0.88em;
-  color: #555;
-  line-height: 1.45;
-  margin: 0;
-  text-align: left;
 }
 .article-body {
   font-size: 1em;
@@ -385,101 +303,6 @@ def _fallback_section_cover(category: str, articles: list[dict], hero: dict | No
     return {"headline": headline, "editorial": editorial, "top_stories": top_stories}
 
 
-def _fallback_global_cover(sections: dict[str, list]) -> dict:
-    """Build a readable global cover when AI generation fails."""
-    highlights: list[dict] = []
-    lead_headline = epub_label("fallback_global_headline")
-    for category, articles in sections.items():
-        if not articles:
-            continue
-        lead = articles[0]
-        if not highlights:
-            lead_headline = _truncate(lead.get("title") or category, 90)
-        highlights.append({
-            "section": category,
-            "headline": _truncate(lead.get("title", ""), 100),
-            "story": _truncate(lead.get("summary") or lead["title"], 160),
-        })
-    if not highlights:
-        return {}
-    return {
-        "headline": lead_headline,
-        "editorial": epub_label(
-            "fallback_global_editorial",
-            total=sum(len(v) for v in sections.values()),
-            sections=len(highlights),
-        ),
-        "highlights": highlights[:4],
-    }
-
-
-def _cover_highlight_xhtml(h: dict) -> str:
-    """One section desk note on the opening spread."""
-    sec = escape(h.get("section", ""))
-    source = escape(h.get("source", ""))
-    hl_raw = (h.get("headline") or "").strip()
-    story = escape(h.get("story", ""))
-    meta = f"{sec} · {source}" if source else sec
-    parts = [
-        '<div class="lead-story">',
-        f'<p class="article-section">{meta}</p>',
-    ]
-    if hl_raw:
-        parts.append(f"<h4>{escape(hl_raw)}</h4>")
-    parts.append(f"<p>{story}</p></div>")
-    return "".join(parts)
-
-
-def _article_href(category: str, art: dict, sections: dict[str, list]) -> str | None:
-    """Return spine filename for an article (must match generate_epub ordering)."""
-    arts = sections.get(category) or []
-    slug = slugify(category)
-    url = (art.get("url") or "").strip()
-    title = (art.get("title") or "").strip()
-    for i, a in enumerate(arts, start=1):
-        if url and (a.get("url") or "").strip() == url:
-            return f"article_{slug}_{i:02d}.xhtml"
-        if not url and title and (a.get("title") or "").strip() == title:
-            return f"article_{slug}_{i:02d}.xhtml"
-    return None
-
-
-def _top_picks_xhtml(
-    sections: dict[str, list],
-    limit: int,
-    hero: dict | None = None,
-) -> str:
-    """Ranked briefing — excludes the edition hero (cover line)."""
-    picks = ranked_excluding_hero(sections, hero, limit)
-    if not picks:
-        return ""
-    parts: list[str] = [
-        '<section class="top-picks">',
-        f'<h2 class="top-picks-heading">{escape(epub_label("top_stories"))}</h2>',
-    ]
-    for score, cat, art in picks:
-        href = _article_href(cat, art, sections)
-        if not href:
-            continue
-        blurb = _article_blurb(art)
-        if not blurb:
-            blurb = (art.get("summary") or art.get("title") or "").strip()
-        blurb = _truncate(blurb, 160)
-        source = (art.get("source") or "").strip()
-        meta = " — ".join(p for p in (cat, source, relevance_display(art)) if p)
-        parts.append(
-            f'<a class="top-pick-card" href="{escape(href)}">'
-            f'<div>'
-            f'<p class="top-pick-meta">{escape(meta)}</p>'
-            f'<h3 class="top-pick-title">{escape(art.get("title", ""))}</h3>'
-            f'<p class="top-pick-blurb">{escape(blurb)}</p>'
-            f"</div>"
-            f"</a>"
-        )
-    parts.append("</section>")
-    return "".join(parts)
-
-
 def _body_paragraphs(text: str, drop_cap: bool = True) -> str:
     """Convert plain-text article body to XHTML paragraphs."""
     paragraphs = [p.strip() for p in text.split("\n") if p.strip()]
@@ -524,54 +347,6 @@ def _article_body_html(art: dict) -> str:
         parts.append(f'<div class="article-body">{_body_paragraphs(body, drop_cap=False)}</div>')
 
     return "".join(parts)
-
-
-def _global_cover_xhtml(cover_data: dict, sections: dict[str, list], now: datetime) -> bytes:
-    total = sum(len(v) for v in sections.values())
-    date_str = format_digest_date(now)
-
-    if not cover_data:
-        cover_data = _fallback_global_cover(sections)
-
-    hero, _hero_cat = find_hero_article(sections, cover_data)
-    top_picks_html = _top_picks_xhtml(
-        sections, get_settings().top_picks_on_cover, hero=hero,
-    )
-    desk_highlights = section_desk_highlights(sections, hero)
-    desk_html = ""
-    if desk_highlights:
-        desk_html = (
-            f'<h2 class="top-picks-heading">{escape(epub_label("by_section"))}</h2>'
-            + "".join(_cover_highlight_xhtml(h) for h in desk_highlights)
-        )
-
-    if cover_data:
-        editorial = escape(cover_data.get("editorial", ""))
-        kicker = f"{escape(epub_label('digest_title'))} &middot; {escape(date_str)} &middot; {total} {epub_label('articles')}"
-        body = (
-            f'<header class="article-header global-cover-header">'
-            f'<p class="article-section">{kicker}</p>'
-            f'<h1 class="article-title">{escape(epub_label("edition_overview"))}</h1>'
-            f'<p class="cover-lead">{editorial}</p>'
-            f"</header>"
-            f"{top_picks_html}"
-            f'<hr class="cover-rule" />'
-            f'<div class="cover-highlights">{desk_html}</div>'
-        )
-    else:
-        kicker = f"{escape(epub_label('digest_title'))} &middot; {escape(date_str)} &middot; {total} {epub_label('articles')}"
-        body = (
-            f'<header class="article-header global-cover-header">'
-            f'<p class="article-section">{kicker}</p>'
-            f'<h1 class="article-title">{escape(epub_label("edition_overview"))}</h1>'
-            f'<p class="cover-lead">{escape(epub_label("sections_today"))}</p>'
-            f"</header>"
-            f"{top_picks_html}"
-            f'<hr class="cover-rule" />'
-            f'<div class="cover-highlights">{desk_html}</div>'
-        )
-
-    return xhtml_page(epub_label("digest_title"), body)
 
 
 def _section_cover_xhtml(
@@ -751,12 +526,16 @@ def generate_epub(
 
     css_item = epub.EpubItem(
         uid="style", file_name="style.css",
-        media_type="text/css", content=_CSS,
+        media_type="text/css", content=_CSS + PAGES_CSS,
     )
     book.add_item(css_item)
 
-    cover_ch = epub.EpubHtml(title=digest, file_name="cover.xhtml", lang=lang)
-    cover_ch.content = _global_cover_xhtml(global_cover, sections, now)
+    for name, data in book_images().items():
+        book.add_item(epub.EpubItem(uid=slugify(name), file_name=name, media_type="image/png", content=data))
+
+    layout = BookLayout(sections)
+    cover_ch = epub.EpubHtml(title=contents, file_name=CONTENTS_FILE, lang=lang)
+    cover_ch.content = xhtml_page(contents, contents_body(layout, hero, hero_category, meta))
     cover_ch.add_item(css_item)
     book.add_item(cover_ch)
 
