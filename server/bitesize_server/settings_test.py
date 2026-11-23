@@ -10,5 +10,7 @@ from .settings import *  # noqa: E402,F403
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 # Tests never reach Gemini with a real key from the developer's shell.
 GEMINI_API_KEY = ""
+# Nor Resend: delivery tests mock the HTTP call.
+RESEND_API_KEY = ""
 # The test client speaks plain HTTP; tests that need the HTTPS redirect turn it on.
 SECURE_SSL_REDIRECT = False

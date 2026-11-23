@@ -12,6 +12,8 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods, require_safe
 
+from editions.delivery import sender_address
+
 from . import throttle
 from .forms import DeliveryForm, InviteForm, LoginForm, SignupForm
 from .models import Invite, InviteUnavailable, redeem_invite
@@ -97,7 +99,11 @@ def delivery(request):
         form.save()
         messages.success(request, "Delivery settings saved.")
         return redirect("delivery")
-    return render(request, "accounts/delivery.html", {"form": form, "has_kindle_email": has_kindle_email})
+    return render(
+        request,
+        "accounts/delivery.html",
+        {"form": form, "has_kindle_email": has_kindle_email, "sender_address": sender_address()},
+    )
 
 
 @require_safe
