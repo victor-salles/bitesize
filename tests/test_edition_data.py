@@ -84,3 +84,21 @@ def test_topic_mention_counts_count_every_tema_of_every_article_most_first():
     counts = topic_mention_counts(sections)
     assert counts == {"tecnologia": 2, "brasil": 1, "ciência": 1, "clima": 1}
     assert list(counts) == ["tecnologia", "brasil", "ciência", "clima"]
+
+
+def test_topic_shares_keep_the_top_and_merge_the_tail():
+    from edition_data import TopicShare, topic_shares
+
+    counts = {"a": 5, "b": 4, "c": 3, "d": 2, "e": 1, "f": 1, "g": 1, "h": 1}
+    shares = topic_shares(counts, limit=6)
+    assert [(s.tema, s.count) for s in shares] == [("a", 5), ("b", 4), ("c", 3), ("d", 2), ("e", 1), ("", 3)]
+    assert shares[0] == TopicShare("a", 5, 5 / 18)
+    assert topic_shares({}) == []
+
+
+def test_short_title_prefers_the_ai_and_otherwise_cuts_at_a_word():
+    from edition_data import short_title
+
+    assert short_title({"short_title": "Gêiseres em Saturno", "title": "x"}) == "Gêiseres em Saturno"
+    assert short_title({"title": "Sonda registra gêiseres de gelo em lua de Saturno"}) == "Sonda registra gêiseres de"
+    assert short_title({"title": "Curto"}) == "Curto"

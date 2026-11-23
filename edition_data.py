@@ -76,3 +76,40 @@ def topic_mention_counts(sections: dict[str, list[dict]]) -> dict[str, int]:
         tema for articles in sections.values() for art in articles or [] for tema in art.get("temas") or []
     )
     return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
+
+
+# The cover legend and the topics page have room for this many topics.
+MAX_TOPICS_SHOWN = 6
+# Short titles on cover B fit in about this many characters.
+SHORT_TITLE_CHARS = 28
+
+
+@dataclass(frozen=True)
+class TopicShare:
+    tema: str  # a tema id, or "" for the merged rest ("outros")
+    count: int
+    share: float  # 0–1 of all mentions
+
+
+def topic_shares(counts: dict[str, int], limit: int = MAX_TOPICS_SHOWN) -> list[TopicShare]:
+    """The top topics by mentions; past *limit*, the tail merges into one "" entry."""
+    total = sum(counts.values())
+    if not total:
+        return []
+    ranked = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    if len(ranked) > limit:
+        rest = sum(count for _, count in ranked[limit - 1:])
+        ranked = ranked[: limit - 1] + [("", rest)]
+    return [TopicShare(tema, count, count / total) for tema, count in ranked]
+
+
+def short_title(art: dict, max_chars: int = SHORT_TITLE_CHARS) -> str:
+    """The AI's short title, or the title cut at a word boundary (cache rows from before short titles)."""
+    short = (art.get("short_title") or "").strip()
+    if short:
+        return short
+    title = (art.get("title") or "").strip()
+    if len(title) <= max_chars:
+        return title
+    cut = title[: max_chars + 1].rsplit(" ", 1)[0].rstrip(" ,;:-–—")
+    return cut or title[:max_chars]

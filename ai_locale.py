@@ -35,6 +35,16 @@ EPUB_LABELS: dict[str, dict[str, str]] = {
         ),
         "tipo_resumo": "Resumo",
         "tipo_artigo_completo": "Artigo completo",
+        "story": "matéria",
+        "stories": "matérias",
+        "mention": "menção",
+        "mentions": "menções",
+        "lead_story": "Manchete",
+        "highlights_today": "Destaques de hoje",
+        "reading": "leitura",
+        "edition_number": "Edição {number}",
+        "edition_topics": "Temas da edição",
+        "other_topics": "outros",
         "tema_política": "política",
         "tema_saúde": "saúde",
         "tema_economia": "economia",
@@ -93,6 +103,16 @@ EPUB_LABELS: dict[str, dict[str, str]] = {
         ),
         "tipo_resumo": "Summary",
         "tipo_artigo_completo": "Full article",
+        "story": "story",
+        "stories": "stories",
+        "mention": "mention",
+        "mentions": "mentions",
+        "lead_story": "Lead story",
+        "highlights_today": "Today's highlights",
+        "reading": "reading",
+        "edition_number": "Edition {number}",
+        "edition_topics": "Topics in this edition",
+        "other_topics": "others",
         "tema_política": "política",
         "tema_saúde": "saúde",
         "tema_economia": "economia",
@@ -188,6 +208,29 @@ def format_digest_date(when: datetime) -> str:
     if code == "pt-BR":
         return f"{weekday}, {when.day} de {month} de {when.year}"
     return when.strftime("%A, %B %d, %Y")
+
+
+def format_long_date(when: datetime) -> str:
+    """`8 de novembro de 2026` or `November 8, 2026`, without the weekday."""
+    month = _labels()["months"][when.month - 1]
+    if ai_language_code() == "pt-BR":
+        return f"{when.day} de {month} de {when.year}"
+    return f"{month} {when.day}, {when.year}"
+
+
+def format_count(count: int, singular_key: str, plural_key: str) -> str:
+    """`1 matéria`, `7 matérias`."""
+    return f"{count} {epub_label(singular_key if count == 1 else plural_key)}"
+
+
+def format_decimal(value: float, decimals: int = 1) -> str:
+    """`9,2` in pt-BR, `9.2` in English."""
+    text = f"{value:.{decimals}f}"
+    return text.replace(".", ",") if ai_language_code() == "pt-BR" else text
+
+
+def tema_label(tema: str) -> str:
+    return epub_label(_tema_label_key(tema))
 
 
 def format_digest_timestamp(when: datetime) -> str:
