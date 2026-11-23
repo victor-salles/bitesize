@@ -63,6 +63,7 @@ class EditionConfig:
     # Overrides for the matching Settings fields when set.
     language: Optional[str] = None
     max_articles_per_feed: Optional[int] = None
+    cover_style: Optional[str] = None
     # None routes AI calls by settings.ai_backend.
     ai: Optional[AIClient] = None
     # None runs AI on every article; the server shares one cache across users.
@@ -81,6 +82,8 @@ class EditionConfig:
             overrides["ai_language"] = self.language
         if self.max_articles_per_feed is not None:
             overrides["max_articles_per_feed"] = self.max_articles_per_feed
+        if self.cover_style is not None:
+            overrides["cover_style"] = self.cover_style
         return dataclasses.replace(self.settings, **overrides)
 
 
@@ -345,6 +348,7 @@ def _build(config: EditionConfig) -> EditionResult:
                 now=now,
                 edition_number=config.edition_number,
                 previous_topic_counts=config.previous_topic_counts,
+                cover_style=get_settings().cover_style,
             ),
         )
 

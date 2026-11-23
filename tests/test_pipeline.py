@@ -141,6 +141,27 @@ def test_build_edition_passes_the_edition_history_to_the_epub(tmp_path, monkeypa
     assert meta.now == datetime(2026, 11, 13, 7, 0)
     assert meta.edition_number == 12
     assert meta.previous_topic_counts == {"economia": 3}
+    assert meta.cover_style == "numero"  # cover B is the default
+
+
+def test_cover_style_comes_from_settings_unless_the_config_overrides_it(tmp_path, monkeypatch, no_global_config):
+    monkeypatch.setattr(feed, "_download_url", lambda url, quiet=False: RSS)
+    monkeypatch.setattr(pipeline, "fetch_article_content", lambda url: BODY)
+    seen = []
+    monkeypatch.setattr(pipeline, "generate_epub", lambda *args, meta: seen.append(meta.cover_style))
+
+    for override in (None, "jornal-invert"):
+        build_edition(
+            EditionConfig(
+                sources={"Economy": {"Wire": "https://feeds.example.com/rss"}},
+                output_dir=tmp_path,
+                settings=Settings(ai_backend="does-not-exist", cover_style="jornal"),
+                ai=FakeAI(),
+                cover_style=override,
+            )
+        )
+
+    assert seen == ["jornal", "jornal-invert"]
 
 
 def test_build_edition_without_readable_articles_writes_nothing(
