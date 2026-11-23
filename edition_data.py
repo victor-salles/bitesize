@@ -23,6 +23,8 @@ class EditionMeta:
     edition_number: Optional[int] = None
     # Topic mention counts of the previous edition; None hides the "vs. ontem" trend.
     previous_topic_counts: Optional[dict[str, int]] = None
+    # cover_art.COVER_STYLES: "numero" (cover B), "jornal" or "jornal-invert" (cover A).
+    cover_style: str = "numero"
 
 
 def word_count(art: dict) -> int:

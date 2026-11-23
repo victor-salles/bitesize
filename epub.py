@@ -8,11 +8,11 @@ from ebooklib import epub
 
 from ai_locale import ai_language_code, epub_label, format_digest_date, format_tag_line
 from config import get_settings
-from cover_art import render_magazine_cover
-from edition_data import EditionMeta
+from cover_art import render_cover
+from cover_data import build_cover_data
+from edition_data import EditionMeta, StoryNumbers
 from gemini import article_relevance, relevance_display
 from magazine_layers import (
-    cover_teasers,
     find_hero_article,
     lead_for_section,
     ranked_excluding_hero,
@@ -771,19 +771,16 @@ def generate_epub(
     book.set_language(lang)
     book.add_author("BiteSIze")
 
-    total_articles = sum(len(v) for v in sections.values())
-    hero, _ = find_hero_article(sections, global_cover)
+    hero, hero_category = find_hero_article(sections, global_cover)
     cover_headline = (global_cover or {}).get("headline") or ""
     if not cover_headline and hero:
         cover_headline = hero.get("title", digest)
     if not cover_headline:
         cover_headline = digest
-    cover_jpeg = render_magazine_cover(
-        masthead=digest,
-        headline=cover_headline,
-        edition_line=f"{format_digest_date(now)} · {total_articles} {epub_label('articles')}",
-        teasers=cover_teasers(sections, hero),
-        teasers_label=epub_label("also_inside"),
+    numbers = StoryNumbers(sections)
+    cover_jpeg = render_cover(
+        build_cover_data(sections, cover_headline, hero, hero_category, numbers, meta),
+        meta.cover_style,
     )
     # Metadata-only cover image for Kindle library shelf (create_page=False).
     book.set_cover("cover.jpg", cover_jpeg, create_page=False)
