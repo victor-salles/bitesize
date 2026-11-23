@@ -63,6 +63,10 @@ class BookLayout:
         return self._places[id(art)]
 
 
+def section_file(category: str) -> str:
+    return f"cover_{slugify(category)}.xhtml"
+
+
 def article_file(category: str, index: int) -> str:
     return f"article_{slugify(category)}_{index:02d}.xhtml"
 
