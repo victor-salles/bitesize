@@ -5,6 +5,7 @@
 {% if not has_kindle_email %}
   <p class="notice">No Kindle address yet: editions have nowhere to go.</p>
 {% endif %}
+<p>Add <strong>{{ sender_address }}</strong> to Amazon's Approved Personal Document E-mail List, or your Kindle will not accept editions.</p>
 <form method="post" action="{% url 'delivery' %}" novalidate>
   {% csrf_token %}
   {{ form }}

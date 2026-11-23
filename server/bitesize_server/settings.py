@@ -215,3 +215,7 @@ SERVER_EMAIL = os.environ.get("DJANGO_SERVER_EMAIL") or "root@localhost"
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL") or "gemini-3.5-flash-lite"
 GEMINI_DAILY_REQUEST_CAP = env_int("GEMINI_DAILY_REQUEST_CAP", default=200)
+
+# Editions are emailed to each reader's Kindle through Resend. Empty key: deliveries fail with that reason.
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+DELIVERY_FROM_EMAIL = os.environ.get("DELIVERY_FROM_EMAIL") or "BiteSIze <bitesize@victorsalles.com>"
