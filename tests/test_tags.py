@@ -5,7 +5,7 @@ import pytest
 
 import gemini
 from ai_locale import epub_label, format_tag_line
-from epub import _article_body_html
+from article_page import summary_block
 from tags import TEMAS, TIPOS, infer_tipo, normalize_tags
 
 
@@ -205,7 +205,7 @@ def test_epub_includes_tag_line(isolated_store, monkeypatch):
         "tipo": "artigo-completo",
         "temas": ["política"],
     }
-    html = _article_body_html(art)
+    html = summary_block(art)
     assert "Artigo completo" in html
     assert "política" in html
 
@@ -226,7 +226,7 @@ def test_epub_tag_line_without_summary(isolated_store, monkeypatch):
         "tipo": "resumo",
         "temas": ["economia"],
     }
-    html = _article_body_html(art)
+    html = summary_block(art)
     assert "Resumo" in html
     assert "economia" in html
     assert "summary-label" not in html

@@ -3,17 +3,16 @@ from pathlib import Path
 
 from ebooklib import epub
 
-from ai_locale import ai_language_code, epub_label, format_digest_date, format_tag_line
-from config import get_settings
+from ai_locale import ai_language_code, epub_label, format_digest_date
 from cover_art import render_cover
 from cover_data import build_cover_data
 from edition_data import EditionMeta, StoryNumbers
+from article_page import ARTICLE_CSS, article_body
 from epub_images import book_images
 from epub_pages import CONTENTS_FILE, PAGES_CSS, BookLayout, contents_body, section_body, section_file
-from gemini import relevance_display
 from topics_page import TOPICS_CHART_FILE, TOPICS_CSS, TOPICS_FILE, topics_body, topics_chart_png, topics_data
 from magazine_layers import find_hero_article
-from xhtml import escape, safe_href, slugify, xhtml_page
+from xhtml import safe_href, slugify, xhtml_page  # noqa: F401 (safe_href: tests import it from here)
 
 _CSS = """
 /* Kindle-friendly typography — all sizes in em so the device font slider works */
@@ -61,150 +60,10 @@ p { margin: 0 0 0.75em 0; text-align: justify; }
 
 a { color: #111111; text-decoration: none; }
 
-/* ── Individual articles ──────────────────────────────────────────────────── */
-.article-header { margin-bottom: 1em; }
-.article-section {
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 0.72em;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: #888;
-  margin: 0 0 0.35em 0;
-}
-.article-title {
-  font-size: 1.35em;
-  font-weight: bold;
-  margin: 0 0 0.35em 0;
-  line-height: 1.25;
-}
-.meta {
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 0.75em;
-  color: #666;
-  margin: 0 0 0.8em 0;
-  text-align: left;
-}
-.summary {
-  font-size: 1.02em;
-  color: #222;
-  margin: 0 0 1em 0;
-  line-height: 1.65;
-  padding: 0.6em 0 0.6em 0.8em;
-  border-left: 0.2em solid #bbb;
-}
-.summary-label {
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 0.68em;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #888;
-  margin: 0 0 0.35em 0;
-}
-.summary-meta-line {
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 0.72em;
-  color: #666;
-  margin: 0 0 0.55em 0;
-  letter-spacing: 0.02em;
-}
-.article-body {
-  font-size: 1em;
-  color: #1a1a1a;
-  margin-top: 0.5em;
-}
+/* ── Article body: the reader's font, size and spacing (HANDOFF rule 2) ─── */
+.article-body { margin-top: 1em; }
 .article-body p { margin: 0 0 0.75em 0; }
-.article-body p:first-child::first-letter {
-  font-size: 2.2em;
-  float: left;
-  line-height: 0.85;
-  padding-right: 0.08em;
-  font-weight: bold;
-}
-.read-more {
-  font-size: 0.82em;
-  margin-top: 1.2em;
-  text-align: left;
-}
-
-/* ── Legacy multi-article page (kept for compatibility) ───────────────────── */
-.article     { margin-bottom: 2em; padding-bottom: 1.2em; border-bottom: 0.06em solid #ddd; }
-
-/* ── Fallback simple cover ────────────────────────────────────────────────── */
-.cover     { text-align: center; margin-top: 18%; }
-.c-title   { font-size: 2em; font-weight: bold; margin-bottom: 0.15em; }
-.c-date    { font-size: 0.95em; color: #555; margin-bottom: 0.4em; }
-.c-stats   { font-size: 0.85em; color: #888; }
-.c-stats p { margin: 0.2em 0; text-align: center; }
-.c-stats.cover-stats p {
-  font-size: 0.95em;
-  color: #444;
-  text-align: left;
-  margin: 0.45em 0;
-  line-height: 1.5;
-}
 """
-
-
-def _body_paragraphs(text: str, drop_cap: bool = True) -> str:
-    """Convert plain-text article body to XHTML paragraphs."""
-    paragraphs = [p.strip() for p in text.split("\n") if p.strip()]
-    if not paragraphs:
-        return ""
-    parts = []
-    for i, p in enumerate(paragraphs):
-        cls = ' class="lede"' if drop_cap and i == 0 else ""
-        parts.append(f"<p{cls}>{escape(p)}</p>")
-    return "".join(parts)
-
-
-def _article_body_html(art: dict) -> str:
-    body = (art.get("content") or "").strip()
-    summary = (art.get("summary") or "").strip()
-    parts: list[str] = []
-
-    tag_line = ""
-    if art.get("tipo"):
-        tag_line = format_tag_line(art["tipo"], art.get("temas") or [])
-
-    if summary:
-        rel = relevance_display(art)
-        parts.append(
-            f'<div class="summary">'
-            f'<p class="summary-label">{escape(epub_label("summary"))}</p>'
-            f'<p class="summary-meta-line">{escape(epub_label("relevance_score"))}: {rel}/10</p>'
-        )
-        if tag_line:
-            parts.append(f'<p class="summary-meta-line">{escape(tag_line)}</p>')
-        parts.append(f"<p>{escape(summary)}</p>" f"</div>")
-    elif tag_line:
-        parts.append(
-            f'<div class="summary">'
-            f'<p class="summary-meta-line">{escape(tag_line)}</p>'
-            f"</div>"
-        )
-
-    if len(body) >= get_settings().min_body_chars:
-        parts.append(f'<div class="article-body">{_body_paragraphs(body)}</div>')
-    elif body and not summary:
-        parts.append(f'<div class="article-body">{_body_paragraphs(body, drop_cap=False)}</div>')
-
-    return "".join(parts)
-
-
-def _article_xhtml(category: str, art: dict, index: int, total: int) -> bytes:
-    pub_tag = f" &middot; {art['published']}" if art.get("published") else ""
-    body = (
-        f'<header class="article-header">'
-        f'<p class="article-section">{escape(category)} &middot; {index} {epub_label("article_of")} {total}</p>'
-        f'<h1 class="article-title">{escape(art["title"])}</h1>'
-        f'<p class="meta">{escape(art["source"])}{pub_tag}</p>'
-        f"</header>"
-        f"{_article_body_html(art)}"
-    )
-    href = safe_href(art.get("url", ""))
-    if href:
-        body += f'<p class="read-more"><a href="{href}">{escape(epub_label("read_full"))}</a></p>'
-    return xhtml_page(art["title"], body)
 
 
 def generate_epub(
@@ -243,7 +102,7 @@ def generate_epub(
 
     css_item = epub.EpubItem(
         uid="style", file_name="style.css",
-        media_type="text/css", content=_CSS + PAGES_CSS + TOPICS_CSS,
+        media_type="text/css", content=_CSS + PAGES_CSS + TOPICS_CSS + ARTICLE_CSS,
     )
     book.add_item(css_item)
 
@@ -285,7 +144,6 @@ def generate_epub(
         spine.append(section_ch)
         section_links: list = [epub.Link(section_file(category), category, f"section_{slug}")]
 
-        total = len(articles)
         for i, art in enumerate(articles, start=1):
             art_slug = f"{slug}_{i:02d}"
             art_ch = epub.EpubHtml(
@@ -293,7 +151,7 @@ def generate_epub(
                 file_name=f"article_{art_slug}.xhtml",
                 lang=lang,
             )
-            art_ch.content = _article_xhtml(category, art, i, total)
+            art_ch.content = xhtml_page(art["title"], article_body(art, layout))
             art_ch.add_item(css_item)
             book.add_item(art_ch)
             spine.append(art_ch)
