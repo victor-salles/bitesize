@@ -101,3 +101,30 @@ def test_jev_path_asks_the_writing_model_for_the_short_title(monkeypatch):
     )
     (out,) = gemini.process_articles(articles, batch_size=10)
     assert out["short_title"] == "Juros parados"
+
+
+def test_long_articles_are_marked_and_keep_three_key_points(monkeypatch):
+    long_body = "palavra " * 2000
+    articles = [
+        {"title": "Long", "content": long_body, "source": "A"},
+        {"title": "Short", "content": "body two", "source": "B"},
+    ]
+    monkeypatch.setattr(gemini, "_ai_available", lambda: True)
+    monkeypatch.setattr(gemini.jev_triage, "available", lambda: False)
+    seen = []
+
+    def fake_call(instruction, stdin_data, label=""):
+        seen.append((instruction, stdin_data))
+        return ('[{"id":0,"skip":false,"summary":"Ok.","relevance":70,'
+                '"key_points":["Um.","Dois.","Três.","Quatro."]},'
+                '{"id":1,"skip":false,"summary":"Ok.","relevance":60,"key_points":"not a list"}]')
+
+    monkeypatch.setattr(gemini, "_call_ai", fake_call)
+    out = {a["title"]: a for a in gemini.process_articles(articles, batch_size=2)}
+
+    instruction, block = seen[0]
+    assert "key_points" in instruction
+    assert block.count(gemini.LONG_ARTICLE_MARK) == 1
+    assert block.index(gemini.LONG_ARTICLE_MARK) < block.index('[1] "Short"')
+    assert out["Long"]["key_points"] == ["Um.", "Dois.", "Três."]
+    assert "key_points" not in out["Short"]

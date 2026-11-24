@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 
 from ai_locale import ai_language_code, epub_label, tema_label, tipo_label
 from config import get_settings
-from edition_data import WORDS_PER_MINUTE, format_reading_time, human_published, reading_minutes, word_count
+from edition_data import WORDS_PER_MINUTE, format_reading_time, human_published, is_long, word_count
 from epub_pages import (
     CONTENTS_FILE,
     BookLayout,
@@ -21,8 +21,6 @@ from epub_pages import (
 )
 from xhtml import escape, safe_href
 
-# Above this many minutes an article is a long read: key points and an outline.
-LONG_READ_MINUTES = 8
 # A subheading is a short line without closing punctuation.
 _HEADING_MAX_CHARS = 80
 _HEADING_MAX_WORDS = 10
@@ -58,10 +56,6 @@ def article_blocks(content: str) -> list[Block]:
         else:
             blocks.append(Block(line))
     return blocks
-
-
-def is_long(art: dict) -> bool:
-    return reading_minutes(art) > LONG_READ_MINUTES
 
 
 def _format_words(count: int) -> str:
