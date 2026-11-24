@@ -35,7 +35,7 @@ The dashboard **Preview** tab now loads live headlines per source. The header **
 
 5. **Gmail and Calendar on the daily run.** Code is ready; flags are still off. Needs Google OAuth files on the machine (`credentials.json` / `token.json`).
 
-6. **Stock-Kindle navigation, not scripts.** Internal links, a better opening page, maybe clippings later. JavaScript, forms, and quizzes will not run on an unmodified Kindle — see `docs/research/2026-08-14-kindle-interactive-epub.md`. Type and magazine hierarchy on that page: [VIC-14](https://linear.app/victor-salles/issue/VIC-14/opening-page-should-feel-like-a-magazine-cover).
+6. **Stock-Kindle navigation, not scripts.** The Kindle redesign ([handoff](docs/design/kindle-redesign/HANDOFF.md)) landed as stacked PRs #103–#109: 3:4 grey covers (B by default, A behind `cover_style`), a one-column contents page with story numbers 01–NN, a topics page, one opener per section, and article pages with long-read key points and outlines. Still open: check it in Kindle Previewer 3, and add `cover_style` to the server profile and Delivery tab. JavaScript, forms, and quizzes will not run on an unmodified Kindle — see `docs/research/2026-08-14-kindle-interactive-epub.md`.
 
 7. **Kindle library cleanup is manual.** Amazon has no auto-delete for Send-to-Kindle personal documents. See [docs/research/2026-08-30-kindle-auto-delete.md](docs/research/2026-08-30-kindle-auto-delete.md).
 

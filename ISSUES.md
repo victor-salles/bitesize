@@ -2,6 +2,11 @@
 
 Open problems seen in the running app. There is no GitHub issue tracker yet. Close an item here when it is no longer true.
 
+## Section covers are generated but no longer shown
+
+**Expected:** Every AI call feeds something the reader sees.  
+**Actual:** Since the Kindle redesign, section openers are built from the stories themselves. `pipeline` still calls `generate_section_cover` once per section, and its headline, editorial and top stories are dropped. The `index_entries_per_page` and `top_picks_on_cover` settings also do nothing now. Drop the calls and the two settings (the dashboard lists every row in the settings table, so remove the rows too).
+
 ## Jev has scored nothing since 28 September
 
 **Expected:** Each morning run gets Jev scores (ad, relevance, tipo, temas) for every story.  
