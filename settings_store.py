@@ -39,6 +39,7 @@ SETTINGS_DEFAULTS: dict[str, tuple[str, str, Any]] = {
     "min_summary_chars": ("filter", "int", 80),
     "index_entries_per_page": ("epub", "int", 10),
     "top_picks_on_cover": ("epub", "int", 6),
+    "cover_style": ("epub", "str", "numero"),
     "kindle_email": ("kindle", "str", ""),
     "smtp_user": ("kindle", "str", ""),
     "smtp_password": ("kindle", "str", ""),
@@ -82,6 +83,8 @@ class Settings:
     min_summary_chars: int = 80
     index_entries_per_page: int = 10
     top_picks_on_cover: int = 6
+    # cover_art.COVER_STYLES: "numero" (cover B), "jornal" (cover A) or "jornal-invert".
+    cover_style: str = "numero"
     kindle_email: str = ""
     smtp_user: str = ""
     smtp_password: str = ""

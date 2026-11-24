@@ -60,3 +60,44 @@ def test_process_articles_jev_filters_ads_and_summarizes(monkeypatch):
     assert out[0]["relevance"] == 80
     assert out[0]["summary"] == "Rates held. Markets paused."
 
+
+
+def test_process_articles_keeps_the_ai_short_title(monkeypatch):
+    articles = [
+        {"title": "Sonda registra gêiseres de gelo em lua de Saturno", "content": "body", "source": "A"},
+        {"title": "Two", "content": "body two", "source": "B"},
+    ]
+    monkeypatch.setattr(gemini, "_ai_available", lambda: True)
+    monkeypatch.setattr(gemini.jev_triage, "available", lambda: False)
+    seen = []
+
+    def fake_call(instruction, stdin_data, label=""):
+        seen.append(instruction)
+        return ('[{"id":0,"skip":false,"summary":"Ok.","relevance":70,"short_title":"  Gêiseres em Saturno "},'
+                '{"id":1,"skip":false,"summary":"Ok.","relevance":60}]')
+
+    monkeypatch.setattr(gemini, "_call_ai", fake_call)
+    out = {a["title"]: a for a in gemini.process_articles(articles, batch_size=2)}
+
+    assert "short_title" in seen[0]
+    assert out["Sonda registra gêiseres de gelo em lua de Saturno"]["short_title"] == "Gêiseres em Saturno"
+    assert "short_title" not in out["Two"]
+
+
+@pytest.mark.allow_jev
+def test_jev_path_asks_the_writing_model_for_the_short_title(monkeypatch):
+    articles = [{"title": "News", "content": "A real story about rates. " * 10, "source": "G1"}]
+
+    def _classify(arts, **kwargs):
+        return [{**a, "skip": False, "relevance": 80, "relevance_source": "ai", "tipo": "resumo", "temas": []}
+                for a in arts]
+
+    monkeypatch.setattr(gemini.jev_triage, "available", lambda: True)
+    monkeypatch.setattr(gemini.jev_triage, "classify_articles", _classify)
+    monkeypatch.setattr(gemini, "_ai_available", lambda: True)
+    monkeypatch.setattr(
+        gemini, "_call_ai",
+        lambda instruction, stdin_data, label="": '[{"id":0,"summary":"Rates held.","short_title":"Juros parados"}]',
+    )
+    (out,) = gemini.process_articles(articles, batch_size=10)
+    assert out["short_title"] == "Juros parados"

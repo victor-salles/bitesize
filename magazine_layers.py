@@ -81,30 +81,6 @@ def lead_for_section(articles: list[dict], hero: dict | None) -> dict | None:
     return articles[0] if articles else None
 
 
-def cover_teasers(
-    sections: dict[str, list[dict]],
-    hero: dict | None,
-    limit: int = 3,
-) -> list[str]:
-    """
-    Cover rails — one inside teaser per section (never the hero).
-
-    Like magazine cover lines: "Plus: Tech · The Verge · …"
-    """
-    teasers: list[str] = []
-    for cat, arts in sections.items():
-        lead = lead_for_section(arts, hero)
-        if not lead or (hero and is_same_story(lead, hero)):
-            continue
-        source = (lead.get("source") or "").strip()
-        title = (lead.get("title") or "").strip()
-        if source:
-            teasers.append(f"{cat} · {source} · {title}")
-        else:
-            teasers.append(f"{cat} · {title}")
-    return teasers[:limit]
-
-
 def section_desk_highlights(
     sections: dict[str, list[dict]],
     hero: dict | None,

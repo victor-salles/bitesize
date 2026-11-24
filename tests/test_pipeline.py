@@ -141,6 +141,27 @@ def test_build_edition_passes_the_edition_history_to_the_epub(tmp_path, monkeypa
     assert meta.now == datetime(2026, 11, 13, 7, 0)
     assert meta.edition_number == 12
     assert meta.previous_topic_counts == {"economia": 3}
+    assert meta.cover_style == "numero"  # cover B is the default
+
+
+def test_cover_style_comes_from_settings_unless_the_config_overrides_it(tmp_path, monkeypatch, no_global_config):
+    monkeypatch.setattr(feed, "_download_url", lambda url, quiet=False: RSS)
+    monkeypatch.setattr(pipeline, "fetch_article_content", lambda url: BODY)
+    seen = []
+    monkeypatch.setattr(pipeline, "generate_epub", lambda *args, meta: seen.append(meta.cover_style))
+
+    for override in (None, "jornal-invert"):
+        build_edition(
+            EditionConfig(
+                sources={"Economy": {"Wire": "https://feeds.example.com/rss"}},
+                output_dir=tmp_path,
+                settings=Settings(ai_backend="does-not-exist", cover_style="jornal"),
+                ai=FakeAI(),
+                cover_style=override,
+            )
+        )
+
+    assert seen == ["jornal", "jornal-invert"]
 
 
 def test_build_edition_without_readable_articles_writes_nothing(
@@ -312,3 +333,26 @@ def test_build_edition_skips_an_article_on_an_internal_address(tmp_path, fake_ne
     pages = b"".join(item.get_content() for item in book.get_items())
     assert b"Rates hold steady" in pages
     assert b"Cloud metadata" not in pages
+
+
+def test_article_cache_carries_the_short_title_and_tolerates_rows_without_it(monkeypatch):
+    cache = MemoryCache()
+    cache.rows[("https://example.com/old", "en")] = {
+        "summary": "Old row.", "relevance": 50, "tipo": "resumo", "temas": [],
+    }
+    fresh = {"url": "https://example.com/new", "title": "New story", "content": BODY}
+
+    def fake_process(articles):
+        return [{**art, "summary": "S.", "relevance": 70, "relevance_source": "ai", "tipo": "resumo",
+                 "temas": [], "short_title": "New"} for art in articles]
+
+    monkeypatch.setattr(pipeline, "process_articles", fake_process)
+    with config.use_settings(Settings(ai_language="en")):
+        out = pipeline._process_articles(
+            [{"url": "https://example.com/old", "title": "Old story", "content": BODY}, fresh], cache
+        )
+
+    by_url = {art["url"]: art for art in out}
+    assert "short_title" not in by_url["https://example.com/old"]
+    assert by_url["https://example.com/new"]["short_title"] == "New"
+    assert cache.rows[("https://example.com/new", "en")]["short_title"] == "New"

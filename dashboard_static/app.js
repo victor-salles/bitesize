@@ -15,6 +15,7 @@ const FIELD_UNITS = {
 
 const FIELD_CHOICES = {
   ai_backend: ["antigravity", "gemini", "ollama"],
+  cover_style: ["numero", "jornal", "jornal-invert"],
 };
 
 // TODO(human): list the settings keys that belong under "Advanced".

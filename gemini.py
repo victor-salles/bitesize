@@ -216,6 +216,21 @@ def spread_tied_scores(articles: list[dict]) -> list[dict]:
     return articles
 
 
+# Optional AI fields on top of summary/relevance/tags; old cache rows may lack them.
+OPTIONAL_AI_FIELDS = ("short_title",)
+SHORT_TITLE_RULE = (
+    "short_title: the story in at most 4 words, for a cover highlight "
+    "(no quotes, no final period). "
+)
+
+
+def _copy_optional_fields(art: dict, item: dict) -> None:
+    """Copy short_title from an AI item onto *art*, trimmed; absent or blank stays absent."""
+    short = item.get("short_title")
+    if isinstance(short, str) and short.strip():
+        art["short_title"] = short.strip()[:60]
+
+
 def process_articles(articles: list[dict], batch_size: int | None = None) -> list[dict]:
     """
     Single flat pass over all articles.
@@ -285,23 +300,25 @@ def _fill_summaries(articles: list[dict], batch_size: int) -> list[dict]:
         instruction = (
             f"You are a news editor. Write a 2-sentence factual summary for each of "
             f"{len(batch)} articles. Return ONLY a raw JSON array — no markdown fences: "
-            '[{"id":0,"summary":"Sentence one. Sentence two."}] '
-            "Rules: exactly 2 factual sentences, no editorialising, no filler phrases."
+            '[{"id":0,"summary":"Sentence one. Sentence two.","short_title":"Rates hold"}] '
+            "Rules: summary: exactly 2 factual sentences, no editorialising, no filler phrases. "
+            + SHORT_TITLE_RULE
             + ai_output_language_rule()
         )
         response = _call_ai(instruction, article_block)
-        by_id: dict[int, str] = {}
+        by_id: dict[int, dict] = {}
         if response:
             parsed = _extract_json(response)
             if isinstance(parsed, list):
                 for item in parsed:
                     idx = item.get("id", -1)
                     if 0 <= idx < len(batch) and item.get("summary"):
-                        by_id[idx] = item["summary"]
+                        by_id[idx] = item
         for j, art in enumerate(batch):
             a = art.copy()
             if j in by_id:
-                a["summary"] = by_id[j]
+                a["summary"] = by_id[j]["summary"]
+                _copy_optional_fields(a, by_id[j])
             processed.append(a)
     return processed
 
@@ -335,7 +352,7 @@ def _process_articles_llm(articles: list[dict], batch_size: int) -> list[dict]:
             f"You are a news editor reviewing {len(batch)} article snippets. "
             "Return ONLY a raw JSON array — no markdown fences, no explanation — with one object per article: "
             '[{"id":0,"skip":false,"summary":"Sentence one. Sentence two.","relevance":72,'
-            '"tipo":"artigo-completo","temas":["política"]}] '
+            '"tipo":"artigo-completo","temas":["política"],"short_title":"Senado aprova reforma"}] '
             "Rules: skip=true ONLY for pure advertisements or sponsored/promotional content; "
             "real news is never skipped regardless of topic. "
             "summary: exactly 2 factual sentences, no editorialising, no filler phrases. "
@@ -344,7 +361,8 @@ def _process_articles_llm(articles: list[dict], batch_size: int) -> list[dict]:
             "Use the full scale: at most one in five items above 80, at least one in five below 45. "
             "Do not give several stories the same number. "
             'tipo: exactly "resumo" (paywall teaser or lede-only) or "artigo-completo" (enough body to read). '
-            f"temas: zero or more from this fixed list only — do not invent labels: {temas_list}."
+            f"temas: zero or more from this fixed list only — do not invent labels: {temas_list}. "
+            + SHORT_TITLE_RULE
             + ai_output_language_rule()
         )
 
@@ -368,6 +386,7 @@ def _process_articles_llm(articles: list[dict], batch_size: int) -> list[dict]:
                     else:
                         art = batch[idx].copy()
                         art["summary"] = item.get("summary", "")
+                        _copy_optional_fields(art, item)
                         if "relevance" in item:
                             art["relevance"] = _normalize_relevance(item.get("relevance"))
                             art["relevance_source"] = "ai"

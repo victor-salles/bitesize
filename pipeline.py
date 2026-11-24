@@ -25,7 +25,7 @@ from edition_data import EditionMeta, topic_mention_counts
 from epub import generate_epub
 from feed import fetch_article_content, fetch_feed, filter_headline_only
 from safe_fetch import FetchError
-from gemini import generate_global_cover, generate_section_cover, process_articles, spread_tied_scores
+from gemini import OPTIONAL_AI_FIELDS, generate_global_cover, generate_section_cover, process_articles, spread_tied_scores
 from magazine_layers import article_rank_sort_key
 from paywall import log_summary, reset_stats
 from settings_store import Settings
@@ -45,8 +45,10 @@ class ArticleCache(Protocol):
     """Per-article AI output (summary, score, tags) kept across editions.
 
     A result is {"skip": True} for an ad the AI dropped, otherwise
-    {"summary", "relevance", "tipo", "temas"}. get() returns None on a miss
-    or when the cached copy is stale.
+    {"summary", "relevance", "tipo", "temas"} plus any of
+    gemini.OPTIONAL_AI_FIELDS the AI wrote (rows from before a field existed
+    lack it; pages fall back). get() returns None on a miss or when the
+    cached copy is stale.
     """
 
     def get(self, art: dict, language: str) -> Optional[dict]: ...
@@ -63,6 +65,7 @@ class EditionConfig:
     # Overrides for the matching Settings fields when set.
     language: Optional[str] = None
     max_articles_per_feed: Optional[int] = None
+    cover_style: Optional[str] = None
     # None routes AI calls by settings.ai_backend.
     ai: Optional[AIClient] = None
     # None runs AI on every article; the server shares one cache across users.
@@ -81,6 +84,8 @@ class EditionConfig:
             overrides["ai_language"] = self.language
         if self.max_articles_per_feed is not None:
             overrides["max_articles_per_feed"] = self.max_articles_per_feed
+        if self.cover_style is not None:
+            overrides["cover_style"] = self.cover_style
         return dataclasses.replace(self.settings, **overrides)
 
 
@@ -134,6 +139,7 @@ def _process_articles(articles: list[dict], cache: Optional[ArticleCache]) -> li
         elif not cached.get("skip"):
             hit = {**art, "summary": cached.get("summary", ""), "relevance": cached["relevance"],
                    "relevance_source": "ai"}
+            hit.update({key: cached[key] for key in OPTIONAL_AI_FIELDS if cached.get(key)})
             hits.append(normalize_tags(hit, cached))
 
     processed = process_articles(misses) if misses else []
@@ -151,6 +157,7 @@ def _process_articles(articles: list[dict], cache: Optional[ArticleCache]) -> li
                 "relevance": out["relevance"],
                 "tipo": out.get("tipo"),
                 "temas": out.get("temas", []),
+                **{key: out[key] for key in OPTIONAL_AI_FIELDS if out.get(key)},
             })
 
     if hits:
@@ -345,6 +352,7 @@ def _build(config: EditionConfig) -> EditionResult:
                 now=now,
                 edition_number=config.edition_number,
                 previous_topic_counts=config.previous_topic_counts,
+                cover_style=get_settings().cover_style,
             ),
         )
 

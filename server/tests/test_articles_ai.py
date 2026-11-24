@@ -152,6 +152,17 @@ def test_cache_miss_then_hit():
 
 
 @pytest.mark.django_db
+def test_cache_keeps_the_optional_ai_fields_and_reads_rows_without_them():
+    cache = DatabaseArticleCache()
+    cache.put(ART, "en", {**RESULT, "short_title": "Rates hold"})
+    assert cache.get(ART, "en") == {**RESULT, "short_title": "Rates hold", "skip": False}
+
+    # A row written before short titles existed, shared by every user: no field, no error.
+    Article.objects.filter(url=ART["url"]).update(tags={"tipo": "artigo-completo", "temas": ["economia"]})
+    assert cache.get(ART, "en") == {**RESULT, "skip": False}
+
+
+@pytest.mark.django_db
 def test_cache_is_invalidated_when_the_text_changes():
     cache = DatabaseArticleCache()
     cache.put(ART, "en", RESULT)
