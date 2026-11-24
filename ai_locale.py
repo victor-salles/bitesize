@@ -45,6 +45,7 @@ EPUB_LABELS: dict[str, dict[str, str]] = {
         "edition_number": "Edição {number}",
         "edition_topics": "Temas da edição",
         "other_topics": "outros",
+        "includes_lead_story": "inclui a manchete",
         "tema_política": "política",
         "tema_saúde": "saúde",
         "tema_economia": "economia",
@@ -113,6 +114,7 @@ EPUB_LABELS: dict[str, dict[str, str]] = {
         "edition_number": "Edition {number}",
         "edition_topics": "Topics in this edition",
         "other_topics": "others",
+        "includes_lead_story": "includes the lead story",
         "tema_política": "política",
         "tema_saúde": "saúde",
         "tema_economia": "economia",
@@ -218,6 +220,16 @@ def format_long_date(when: datetime) -> str:
     return f"{month} {when.day}, {when.year}"
 
 
+def format_short_date(when: datetime) -> str:
+    """`Dom · 8 nov 2026` or `Sun · Nov 8 2026`."""
+    labels = _labels()
+    weekday = labels["weekdays"][when.weekday()][:3].capitalize()
+    month = labels["months"][when.month - 1][:3]
+    if ai_language_code() == "pt-BR":
+        return f"{weekday} · {when.day} {month} {when.year}"
+    return f"{weekday} · {month} {when.day} {when.year}"
+
+
 def format_count(count: int, singular_key: str, plural_key: str) -> str:
     """`1 matéria`, `7 matérias`."""
     return f"{count} {epub_label(singular_key if count == 1 else plural_key)}"
@@ -231,6 +243,10 @@ def format_decimal(value: float, decimals: int = 1) -> str:
 
 def tema_label(tema: str) -> str:
     return epub_label(_tema_label_key(tema))
+
+
+def tipo_label(tipo: str) -> str:
+    return epub_label("tipo_artigo_completo" if tipo == "artigo-completo" else "tipo_resumo")
 
 
 def format_digest_timestamp(when: datetime) -> str:

@@ -81,25 +81,6 @@ def lead_for_section(articles: list[dict], hero: dict | None) -> dict | None:
     return articles[0] if articles else None
 
 
-def section_desk_highlights(
-    sections: dict[str, list[dict]],
-    hero: dict | None,
-) -> list[dict]:
-    """Opening-spread desk notes — one distinct lead per section."""
-    out: list[dict] = []
-    for cat, arts in sections.items():
-        lead = lead_for_section(arts, hero)
-        if not lead:
-            continue
-        out.append({
-            "section": cat,
-            "headline": lead.get("title", ""),
-            "story": (lead.get("summary") or lead.get("title") or "").strip(),
-            "source": lead.get("source", ""),
-        })
-    return out
-
-
 def ranked_excluding_hero(
     sections: dict[str, list[dict]],
     hero: dict | None,
