@@ -245,3 +245,14 @@ def test_factories_give_the_configured_client_and_the_database_cache(settings):
 
     assert isinstance(client, GeminiClient) and client.model == "gemini-other"
     assert isinstance(get_article_cache(), DatabaseArticleCache)
+
+
+@pytest.mark.django_db
+def test_cache_stores_an_empty_summary_when_the_ai_returns_none():
+    # Seen in production on 2026-11-23: the AI scored an article but sent
+    # "summary": null, and the NOT NULL column failed the whole edition.
+    cache = DatabaseArticleCache()
+
+    cache.put(ART, "en", {**RESULT, "summary": None, "temas": None})
+
+    assert cache.get(ART, "en") == {**RESULT, "summary": "", "temas": [], "skip": False}
