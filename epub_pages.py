@@ -83,6 +83,11 @@ def score_img(art: dict) -> str:
     )
 
 
+def tipo_text(art: dict) -> str:
+    """`artigo completo` / `resumo`; empty for Inbox and Calendar items, which have no tipo."""
+    return tipo_label(art["tipo"]).lower() if art.get("tipo") else ""
+
+
 def minutes(art: dict) -> str:
     return format_reading_time(reading_minutes(art))
 
@@ -112,7 +117,7 @@ def wavy_heading(name: str, tag: str = "h2", css_class: str = "desk-head") -> st
 def _lead_entry(art: dict, category: str, layout: BookLayout) -> str:
     place = layout.place(art)
     kicker = " · ".join(p for p in (epub_label("lead_story"), category, (art.get("source") or "").strip()) if p)
-    meta = " · ".join(p for p in (relevance_label(art), minutes(art), tipo_label(art.get("tipo", "")).lower()) if p)
+    meta = " · ".join(p for p in (relevance_label(art), minutes(art), tipo_text(art)) if p)
     dek = (art.get("summary") or "").strip()
     dek_html = f'<p class="toc-dek">{escape(dek)}</p>' if dek else ""
     return (
@@ -166,6 +171,77 @@ def contents_body(
     return "".join(parts)
 
 
+# ── section opener (Section.dc.html) ─────────────────────────────────────────
+
+def nav_bar(left: tuple[str, str] | None, center: tuple[str, str] | None, right: tuple[str, str] | None) -> str:
+    """← left · center · right →, each an (href, label) or None."""
+    cells = []
+    for position, link in (("left", left), ("center", center), ("right", right)):
+        if link is None:
+            cells.append(f'<td class="nav-{position}"></td>')
+            continue
+        href, label = link
+        text = {"left": f"&#8592; {escape(label)}", "center": escape(label), "right": f"{escape(label)} &#8594;"}
+        cells.append(f'<td class="nav-{position}"><a href="{href}">{text[position]}</a></td>')
+    return f'<table class="page-nav"><tr>{"".join(cells)}</tr></table>'
+
+
+def section_body(category: str, layout: BookLayout) -> str:
+    articles = layout.sections[category]
+    categories = list(layout.sections)
+    position = categories.index(category)
+    total_minutes = sum(reading_minutes(art) for art in articles)
+    sources = list(dict.fromkeys((art.get("source") or "").strip() for art in articles if art.get("source")))
+
+    parts = [
+        '<div class="section-band">',
+        running_head(
+            epub_label("section_of", index=position + 1, total=len(categories)),
+            f"{format_count(len(articles), 'story', 'stories')} · {format_reading_time(total_minutes)}",
+        ),
+        f'<h1 class="section-name">{escape(category)}</h1>',
+        f'<p class="section-sources">{escape(" · ".join(sources))}</p>' if sources else "",
+        "</div>",
+    ]
+
+    lead, others = articles[0], articles[1:]
+    place = layout.place(lead)
+    kicker = " · ".join(p for p in (place.label, epub_label("section_lead"), (lead.get("source") or "").strip()) if p)
+    meta = " · ".join(p for p in (relevance_label(lead), minutes(lead), tipo_text(lead)) if p)
+    dek = (lead.get("summary") or "").strip()
+    parts.append(
+        '<div class="section-lead">'
+        f'<p class="kicker">{escape(kicker)}</p>'
+        f'<p class="section-lead-title"><a href="{place.href}">{escape(lead.get("title", ""))}</a></p>'
+        + (f'<p class="section-dek">{escape(dek)}</p>' if dek else "")
+        + f'<p class="toc-meta">{score_img(lead)} {escape(meta)}</p>'
+        "</div>"
+    )
+    for art in others:
+        place = layout.place(art)
+        dek = (art.get("summary") or "").strip()
+        relevance = f'{epub_label("relevance")} {relevance_label(art)}'
+        meta = " · ".join(p for p in (relevance, minutes(art), tipo_text(art)) if p)
+        parts.append(
+            '<table class="section-row"><tr>'
+            f'<td class="section-num">{place.label}</td>'
+            '<td class="toc-main">'
+            f'<p class="kicker">{escape((art.get("source") or "").strip())}</p>'
+            f'<p class="section-title"><a href="{place.href}">{escape(art.get("title", ""))}</a></p>'
+            + (f'<p class="section-dek">{escape(dek)}</p>' if dek else "")
+            + f'<p class="toc-meta">{escape(meta)}</p>'
+            "</td></tr></table>"
+        )
+
+    next_category = categories[position + 1] if position + 1 < len(categories) else None
+    parts.append(nav_bar(
+        (CONTENTS_FILE, epub_label("contents_short")),
+        (layout.place(lead).href, epub_label("start_reading")),
+        (section_file(next_category), next_category) if next_category else None,
+    ))
+    return "".join(parts)
+
+
 PAGES_CSS = """
 /* ── Redesign (docs/design/kindle-redesign): structure only, greys only ──── */
 .running-head { width: 100%; border-collapse: collapse; margin: 0 0 0.4em 0; }
@@ -215,10 +291,38 @@ h2.desk-head {
   font-size: 1.45em; font-weight: bold; letter-spacing: -0.01em; margin: 0; line-height: 1.1;
 }
 h2.desk-head .wave-name { padding: 0 0.45em; }
+div.section-band { background-color: #111111; color: #ffffff; padding: 0.9em 0.9em 0.8em 0.9em; margin: 0; }
+div.section-band .running-head td { color: #d0d0d0; }
+h1.section-name {
+  font-family: Georgia, "Bookerly", serif; font-size: 2.6em; line-height: 1; letter-spacing: -0.02em;
+  border: none; padding: 0; margin: 0.35em 0 0.2em 0; color: #ffffff;
+}
+.section-sources {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 0.62em; font-weight: bold;
+  letter-spacing: 0.1em; text-transform: uppercase; color: #d0d0d0; margin: 0; text-align: left;
+}
+div.section-lead { padding: 0.9em 0 0.8em 0; border-bottom: 0.12em solid #111111; }
+.section-lead-title { font-size: 1.4em; font-weight: bold; line-height: 1.15; margin: 0 0 0.3em 0; text-align: left; }
+.section-title { font-size: 1.05em; font-weight: bold; line-height: 1.25; margin: 0 0 0.2em 0; text-align: left; }
+.section-lead-title a, .section-title a { color: #111111; text-decoration: none; }
+.section-dek { font-size: 0.9em; color: #3d3d3d; line-height: 1.45; margin: 0 0 0.25em 0; text-align: left; }
+table.section-row { width: 100%; border-collapse: collapse; border-bottom: 0.06em solid #d0d0d0; }
+table.section-row td { vertical-align: top; padding: 0.75em 0; }
+td.section-num {
+  width: 2.2em; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: bold; font-size: 1.05em; line-height: 1.2;
+}
 .desk-count {
   text-align: center;
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-size: 0.62em; font-weight: bold; letter-spacing: 0.12em;
   text-transform: uppercase; color: #595959; margin: 0.15em 0 0.1em 0;
 }
+table.page-nav { width: 100%; border-collapse: collapse; border-top: 0.12em solid #111111; margin-top: 1.2em; }
+table.page-nav td {
+  padding: 0.7em 0; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 0.7em;
+  font-weight: bold; letter-spacing: 0.1em; text-transform: uppercase;
+}
+table.page-nav td.nav-center { text-align: center; }
+table.page-nav td.nav-right { text-align: right; }
 """

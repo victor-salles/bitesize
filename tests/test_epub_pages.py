@@ -142,3 +142,42 @@ def test_no_topics_no_topics_page(tmp_path):
     path = tmp_path / "plain.epub"
     generate_epub(sections, {}, {}, path, meta=EditionMeta(now=NOW))
     assert "EPUB/topics.xhtml" not in zipfile.ZipFile(path).namelist()
+
+
+# ── section opener (Section.dc.html) ─────────────────────────────────────────
+
+def test_each_section_opens_with_one_page_and_no_paginated_indexes(tmp_path):
+    book = build(tmp_path)
+    spine = [name for name in _spine(book) if name != "nav.xhtml"]
+    assert spine[2:6] == ["cover_tecnologia.xhtml", "article_tecnologia_01.xhtml",
+                          "article_tecnologia_02.xhtml", "article_tecnologia_03.xhtml"]
+    assert not [name for name in book.namelist() if "/index_" in name]
+
+
+def test_section_page_has_the_band_the_lead_and_the_other_stories(tmp_path):
+    section = page(build(tmp_path), "cover_tecnologia.xhtml")
+    text = _text(section)
+    minutes = sum(reading_minutes(a) for a in sample_sections()["Tecnologia"])
+    assert f"Editoria 1 de 3 3 matérias · {minutes} min" in text
+    assert "Jornal Exemplo · Revista Modelo · Portal Fictício" in text
+    assert "01 · Destaque · Jornal Exemplo Cidade testa ônibus" in text
+    assert re.search(r"02 Revista Modelo Nova bateria .*? Relevância 8,1 · \d+ min · artigo completo", text)
+    assert "Relevância 6,4 · 1 min · resumo" in text
+
+
+def test_section_page_navigation(tmp_path):
+    book = build(tmp_path)
+    first, last = page(book, "cover_tecnologia.xhtml"), page(book, "cover_economia.xhtml")
+    assert 'href="cover.xhtml">← Sumário' in first
+    assert ">Começar a ler<" in first and 'href="article_tecnologia_01.xhtml">Começar a ler' in first
+    assert 'href="cover_ci_ncia.xhtml">Ciência' in first
+    assert "cover_" not in last[last.index('class="page-nav"'):]  # last section: no next one
+
+
+def test_extra_sections_without_tipo_show_no_tipo(tmp_path):
+    sections = sample_sections()
+    sections["Calendar"] = [{"title": "Standup", "content": "Daily sync.", "summary": "", "source": "Cal", "url": ""}]
+    path = tmp_path / "extras.epub"
+    generate_epub(sections, {}, {}, path, meta=EditionMeta(now=NOW))
+    text = _text(zipfile.ZipFile(path).read("EPUB/cover_calendar.xhtml").decode())
+    assert "resumo" not in text.lower()
