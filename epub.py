@@ -13,6 +13,7 @@ from edition_data import EditionMeta, StoryNumbers
 from epub_images import book_images
 from epub_pages import CONTENTS_FILE, PAGES_CSS, BookLayout, contents_body
 from gemini import article_relevance, relevance_display
+from topics_page import TOPICS_CHART_FILE, TOPICS_CSS, TOPICS_FILE, topics_body, topics_chart_png, topics_data
 from xhtml import escape, safe_href, slugify, xhtml_page
 from magazine_layers import (
     find_hero_article,
@@ -526,7 +527,7 @@ def generate_epub(
 
     css_item = epub.EpubItem(
         uid="style", file_name="style.css",
-        media_type="text/css", content=_CSS + PAGES_CSS,
+        media_type="text/css", content=_CSS + PAGES_CSS + TOPICS_CSS,
     )
     book.add_item(css_item)
 
@@ -542,7 +543,19 @@ def generate_epub(
     # Cover first: if `nav` is linear, Kindle opens the NCX link tree (unreadable).
     # Keep the nav document for the TOC button, but mark it non-linear in the spine.
     spine: list = [cover_ch, ("nav", "no")]
-    toc: list = []
+    toc: list = [epub.Link(CONTENTS_FILE, contents, "contents")]
+
+    topics = topics_data(layout, meta.previous_topic_counts)
+    if topics.rows:
+        book.add_item(epub.EpubItem(uid="topics_chart", file_name=TOPICS_CHART_FILE, media_type="image/png",
+                                    content=topics_chart_png(topics)))
+        topics_title = epub_label("edition_topics")
+        topics_ch = epub.EpubHtml(title=topics_title, file_name=TOPICS_FILE, lang=lang)
+        topics_ch.content = xhtml_page(topics_title, topics_body(topics, layout, meta))
+        topics_ch.add_item(css_item)
+        book.add_item(topics_ch)
+        spine.append(topics_ch)
+        toc.append(epub.Link(TOPICS_FILE, topics_title, "topics"))
 
     for category, articles in sections.items():
         if not articles:

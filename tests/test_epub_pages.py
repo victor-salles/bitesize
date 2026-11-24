@@ -97,3 +97,48 @@ def test_book_uses_grey_tones_only(tmp_path):
         hex6 = color[1:] if len(color) == 7 else "".join(ch * 2 for ch in color[1:])
         r, g, b = (int(hex6[i:i + 2], 16) for i in (0, 2, 4))
         assert r == g == b, color
+
+
+# ── topics page (TopicsSquares) ──────────────────────────────────────────────
+
+def _spine(book: zipfile.ZipFile) -> list[str]:
+    opf = book.read("EPUB/content.opf").decode()
+    manifest = dict(re.findall(r'<item[^>]*?href="([^"]+)"[^>]*?id="([^"]+)"', opf))
+    by_id = {v: k for k, v in manifest.items()}
+    by_id.update({i: h for h, i in re.findall(r'<item[^>]*?id="([^"]+)"[^>]*?href="([^"]+)"', opf)})
+    return [by_id.get(i, i) for i in re.findall(r'<itemref[^>]*idref="([^"]+)"', opf)]
+
+
+def test_topics_page_follows_the_contents(tmp_path):
+    book = build(tmp_path)
+    spine = [name for name in _spine(book) if name != "nav.xhtml"]
+    assert spine[:2] == ["cover.xhtml", "topics.xhtml"]
+    assert "EPUB/images/topics.png" in book.namelist()
+
+
+def test_topics_page_links_every_story_that_mentions_a_topic(tmp_path):
+    topics = page(build(tmp_path), "topics.xhtml")
+    text = _text(topics)
+    assert "Temas da edição" in text
+    assert "Tema do dia Tecnologia 27% das menções" in text
+    assert "Mais cruzada Matéria 06 em 3 temas" in text
+    assert 'src="images/topics.png"' in topics
+    tecnologia = re.search(r'Tecnologia</span>(.*?)</p>', topics).group(1)
+    assert re.findall(r">(\d\d)</a>", tecnologia) == ["01", "02", "03", "06"]
+    assert 'href="cover.xhtml"' in topics and 'href="cover_tecnologia.xhtml"' in topics
+
+
+def test_topics_page_shows_the_novelty_only_with_a_previous_edition(tmp_path):
+    assert "Novidade" not in _text(page(build(tmp_path), "topics.xhtml"))
+    with_history = page(build(tmp_path, previous_topic_counts={"tecnologia": 1}), "topics.xhtml")
+    assert "Novidade Brasil não apareceu ontem" in _text(with_history)
+
+
+def test_no_topics_no_topics_page(tmp_path):
+    sections = sample_sections()
+    for arts in sections.values():
+        for art in arts:
+            art["temas"] = []
+    path = tmp_path / "plain.epub"
+    generate_epub(sections, {}, {}, path, meta=EditionMeta(now=NOW))
+    assert "EPUB/topics.xhtml" not in zipfile.ZipFile(path).namelist()
