@@ -82,8 +82,15 @@ def score_png(filled: int) -> bytes:
     return _png(img)
 
 
+@lru_cache(maxsize=None)
+def end_mark_png() -> bytes:
+    """The black square that closes an article (no ■ glyph the font may lack)."""
+    return _png(Image.new("RGBA", (24, 24), INK + (255,)))
+
+
 def book_images() -> dict[str, bytes]:
     """Every image the pages may reference, by file name inside the EPUB."""
     images = {f"images/wave-{side}.png": wave_png(side) for side in _WAVE_PATHS}
     images.update({f"images/score-{n:02d}.png": score_png(n) for n in range(11)})
+    images["images/end-mark.png"] = end_mark_png()
     return images

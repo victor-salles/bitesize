@@ -6,6 +6,7 @@ from ai_locale import ai_output_language_rule
 from config import console, get_settings
 from ai import call as _call_ai, available as _ai_available
 import jev_triage
+from edition_data import is_long
 from tags import TEMAS, normalize_tags
 
 CLUSTERED_AI_SCORE_RATIO = 0.35
@@ -217,18 +218,33 @@ def spread_tied_scores(articles: list[dict]) -> list[dict]:
 
 
 # Optional AI fields on top of summary/relevance/tags; old cache rows may lack them.
-OPTIONAL_AI_FIELDS = ("short_title",)
+OPTIONAL_AI_FIELDS = ("short_title", "key_points")
+KEY_POINTS = 3
+# Put on its own line after a long article's title so the model knows to write key points.
+LONG_ARTICLE_MARK = "(LONG ARTICLE)"
 SHORT_TITLE_RULE = (
     "short_title: the story in at most 4 words, for a cover highlight "
     "(no quotes, no final period). "
+    f"key_points: ONLY for items marked {LONG_ARTICLE_MARK}, exactly {KEY_POINTS} short factual sentences "
+    "a reader can take away; leave the field out for every other item. "
 )
 
 
 def _copy_optional_fields(art: dict, item: dict) -> None:
-    """Copy short_title from an AI item onto *art*, trimmed; absent or blank stays absent."""
+    """Copy short_title and key_points from an AI item onto *art*; absent or malformed stays absent."""
     short = item.get("short_title")
     if isinstance(short, str) and short.strip():
         art["short_title"] = short.strip()[:60]
+    points = item.get("key_points")
+    if is_long(art) and isinstance(points, list):
+        points = [p.strip()[:240] for p in points if isinstance(p, str) and p.strip()]
+        if points:
+            art["key_points"] = points[:KEY_POINTS]
+
+
+def _article_header(index: int, art: dict) -> str:
+    mark = f"{LONG_ARTICLE_MARK}\n" if is_long(art) else ""
+    return f'[{index}] "{art["title"]}"\n{mark}'
 
 
 def process_articles(articles: list[dict], batch_size: int | None = None) -> list[dict]:
@@ -296,11 +312,12 @@ def _fill_summaries(articles: list[dict], batch_size: int) -> list[dict]:
             preview = (
                 _truncate_text(art["content"]) if art.get("content") else art["title"]
             )
-            article_block += f'[{j}] "{art["title"]}"\n{preview}\n\n'
+            article_block += f"{_article_header(j, art)}{preview}\n\n"
         instruction = (
             f"You are a news editor. Write a 2-sentence factual summary for each of "
             f"{len(batch)} articles. Return ONLY a raw JSON array — no markdown fences: "
-            '[{"id":0,"summary":"Sentence one. Sentence two.","short_title":"Rates hold"}] '
+            '[{"id":0,"summary":"Sentence one. Sentence two.","short_title":"Rates hold",'
+            '"key_points":["Point one.","Point two.","Point three."]}] '
             "Rules: summary: exactly 2 factual sentences, no editorialising, no filler phrases. "
             + SHORT_TITLE_RULE
             + ai_output_language_rule()
@@ -345,7 +362,7 @@ def _process_articles_llm(articles: list[dict], batch_size: int) -> list[dict]:
             preview = (
                 _truncate_text(art["content"]) if art["content"] else art["title"]
             )
-            article_block += f'[{j}] "{art["title"]}"\n{preview}\n\n'
+            article_block += f"{_article_header(j, art)}{preview}\n\n"
 
         temas_list = ", ".join(sorted(TEMAS))
         instruction = (

@@ -36,6 +36,14 @@ def reading_minutes(art: dict) -> int:
     return max(1, math.ceil(word_count(art) / WORDS_PER_MINUTE))
 
 
+# Above this many minutes an article is a long read: key points and an outline.
+LONG_READ_MINUTES = 8
+
+
+def is_long(art: dict) -> bool:
+    return reading_minutes(art) > LONG_READ_MINUTES
+
+
 def format_reading_time(minutes: int) -> str:
     return f"{minutes} min"
 
