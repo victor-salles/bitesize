@@ -100,5 +100,5 @@ def test_short_title_prefers_the_ai_and_otherwise_cuts_at_a_word():
     from edition_data import short_title
 
     assert short_title({"short_title": "Gêiseres em Saturno", "title": "x"}) == "Gêiseres em Saturno"
-    assert short_title({"title": "Sonda registra gêiseres de gelo em lua de Saturno"}) == "Sonda registra gêiseres de"
+    assert short_title({"title": "Sonda registra gêiseres de gelo em lua de Saturno"}) == "Sonda registra gêiseres…"
     assert short_title({"title": "Curto"}) == "Curto"

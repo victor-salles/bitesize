@@ -77,3 +77,16 @@ def test_cover_renders_without_optional_parts():
     bare = CoverData(headline="Só a manchete")
     for style in COVER_STYLES:
         assert _image(render_cover(bare, style)).size == (COVER_WIDTH, COVER_HEIGHT)
+
+
+def test_a_short_headline_grows_to_fill_the_space_a_long_one_needs():
+    from cover_art import headline_layout, px
+
+    short_font, short_lines = headline_layout("Juros parados", px(400), px(300))
+    long_font, long_lines = headline_layout(
+        "Banco central mantém os juros e sinaliza cortes graduais no próximo semestre", px(400), px(300)
+    )
+
+    assert short_font.size > long_font.size
+    assert len(short_lines) * round(short_font.size * 1.06) <= px(300)
+    assert len(long_lines) * round(long_font.size * 1.06) <= px(300)

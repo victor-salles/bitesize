@@ -260,16 +260,28 @@ def _render_numero(data: CoverData) -> Image.Image:
     kicker = " · ".join(p for p in (labels.headline, data.section) if p)
     draw_text(draw, pad, y, _upper(kicker), kicker_font, SECONDARY, tracking=px(1.7))
     room = desks_top - px(20) - (y + px(14))
-    headline_font, lines = fit_text(
-        data.headline, content_width, 4, (px(40), px(36), px(32)), lambda s: fraunces(s, 600)
-    )
+    headline_font, lines = headline_layout(data.headline, content_width, room)
     line_height = round(headline_font.size * 1.06)
-    lines = lines[: max(1, room // line_height)]
-    y += px(14)
+    y += px(14) + (room - line_height * len(lines)) // 2
     for line in lines:
         y += line_height
         draw_text(draw, pad, y - round(headline_font.size * 0.2), line, headline_font, INK, tracking=-px(0.6))
     return img
+
+
+HEADLINE_SIZES = (72, 64, 56, 48, 40, 36, 32)
+
+
+def headline_layout(text: str, width: float, room: float) -> tuple[ImageFont.FreeTypeFont, list[str]]:
+    """The largest headline size whose lines fill *room* without overflowing it."""
+    for size in HEADLINE_SIZES:
+        font = fraunces(px(size), 600)
+        lines = wrap(text, font, width)
+        if len(lines) <= 4 and len(lines) * round(font.size * 1.06) <= room:
+            return font, lines
+    font = fraunces(px(HEADLINE_SIZES[-1]), 600)
+    line_height = round(font.size * 1.06)
+    return font, clamp_lines(wrap(text, font, width), max(1, min(4, int(room // line_height))))
 
 
 def _draw_highlight_line(draw, x: float, baseline: float, max_width: float, items: list[str], font) -> None:

@@ -121,5 +121,8 @@ def short_title(art: dict, max_chars: int = SHORT_TITLE_CHARS) -> str:
     title = (art.get("title") or "").strip()
     if len(title) <= max_chars:
         return title
-    cut = title[: max_chars + 1].rsplit(" ", 1)[0].rstrip(" ,;:-–—")
-    return cut or title[:max_chars]
+    words = title[: max_chars + 1].rsplit(" ", 1)[0].split()
+    while len(words) > 1 and len(words[-1].strip(",;:-–—")) <= 3:
+        words.pop()
+    cut = " ".join(words).rstrip(" ,;:-–—")
+    return (cut or title[:max_chars]) + "…"

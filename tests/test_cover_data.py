@@ -48,7 +48,7 @@ def test_cover_teasers_are_the_top_stories_after_the_headline_with_their_book_nu
     assert [(t.number, t.short_title) for t in teasers] == [
         ("04", "Gêiseres em Saturno"),
         ("02", "Bateria de sódio"),
-        ("06", "Feiras de bairro passam a"),
+        ("06", "Feiras de bairro passam…"),
     ]
     assert teasers[0].kicker == "Ciência · Revista Modelo"
 
@@ -58,7 +58,7 @@ def test_cover_desks_count_each_section_and_skip_the_headline_in_the_lead():
     assert [(d.name, d.count, d.lead) for d in desks] == [
         ("Tecnologia", 3, "Bateria de sódio"),
         ("Ciência", 2, "Gêiseres em Saturno"),
-        ("Economia", 2, "Feiras de bairro passam a aceitar pagamento por"),
+        ("Economia", 2, "Feiras de bairro passam a aceitar pagamento…"),
     ]
 
 
