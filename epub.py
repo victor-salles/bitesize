@@ -1,9 +1,7 @@
-import re
 from datetime import datetime
 from pathlib import Path
 
 from ebooklib import epub
-
 
 from ai_locale import ai_language_code, epub_label, format_digest_date, format_tag_line
 from config import get_settings
@@ -11,14 +9,11 @@ from cover_art import render_cover
 from cover_data import build_cover_data
 from edition_data import EditionMeta, StoryNumbers
 from epub_images import book_images
-from epub_pages import CONTENTS_FILE, PAGES_CSS, BookLayout, contents_body
-from gemini import article_relevance, relevance_display
+from epub_pages import CONTENTS_FILE, PAGES_CSS, BookLayout, contents_body, section_body, section_file
+from gemini import relevance_display
 from topics_page import TOPICS_CHART_FILE, TOPICS_CSS, TOPICS_FILE, topics_body, topics_chart_png, topics_data
+from magazine_layers import find_hero_article
 from xhtml import escape, safe_href, slugify, xhtml_page
-from magazine_layers import (
-    find_hero_article,
-    lead_for_section,
-)
 
 _CSS = """
 /* Kindle-friendly typography — all sizes in em so the device font slider works */
@@ -66,94 +61,6 @@ p { margin: 0 0 0.75em 0; text-align: justify; }
 
 a { color: #111111; text-decoration: none; }
 
-/* ── Section cover pages ──────────────────────────────────────────────────── */
-.cat-cover { text-align: center; margin-top: 12%; }
-.cat-title {
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 0.85em;
-  color: #777;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  margin: 0 0 0.5em 0;
-}
-.cat-headline {
-  font-size: 1.65em;
-  font-weight: bold;
-  margin: 0.35em 0 0.7em 0;
-  line-height: 1.2;
-  text-align: left;
-}
-.editorial {
-  font-size: 1em;
-  color: #444;
-  margin: 0 0 1.2em 0;
-  line-height: 1.65;
-  text-align: left;
-}
-.lead-story {
-  margin-bottom: 0.7em;
-  padding: 0.55em 0;
-  border-top: 0.06em solid #ccc;
-  text-align: left;
-}
-.lead-story h4 { font-size: 0.98em; }
-.lead-story p  { font-size: 0.9em; color: #555; margin: 0; text-align: left; }
-
-/* ── Section index (table of contents per category) ───────────────────────── */
-.section-index { margin-top: 0.5em; }
-.section-index-intro {
-  font-size: 0.88em;
-  color: #666;
-  margin-bottom: 1.2em;
-  text-align: left;
-}
-.index-entry {
-  margin-bottom: 1em;
-  padding-bottom: 0.8em;
-  border-bottom: 0.06em solid #ddd;
-}
-a.index-entry-link:last-of-type .index-entry { border-bottom: none; }
-.index-num {
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 0.72em;
-  color: #888;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin: 0 0 0.15em 0;
-}
-.index-title {
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 1.05em;
-  font-weight: bold;
-  margin: 0 0 0.2em 0;
-  line-height: 1.3;
-  color: #1a1a1a;
-}
-a.index-entry-link {
-  display: block;
-  color: inherit;
-  text-decoration: none;
-}
-a.index-entry-link .index-meta { color: #777; }
-.index-meta { font-size: 0.75em; color: #777; margin: 0; text-align: left; }
-.index-blurb {
-  font-size: 0.88em;
-  color: #444;
-  margin: 0.35em 0 0 0;
-  line-height: 1.5;
-  text-align: left;
-}
-.index-page-nav {
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 0.82em;
-  color: #666;
-  margin: 1.2em 0 0 0;
-  padding-top: 0.8em;
-  border-top: 0.06em solid #ccc;
-  text-align: center;
-}
-.index-page-nav a { color: #111111; }
-
 /* ── Individual articles ──────────────────────────────────────────────────── */
 .article-header { margin-bottom: 1em; }
 .article-section {
@@ -200,13 +107,6 @@ a.index-entry-link .index-meta { color: #777; }
   margin: 0 0 0.55em 0;
   letter-spacing: 0.02em;
 }
-.index-relevance {
-  font-size: 0.68em;
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  color: #595959;
-  margin: 0 0 0.35em 0;
-  letter-spacing: 0.03em;
-}
 .article-body {
   font-size: 1em;
   color: #1a1a1a;
@@ -243,65 +143,6 @@ a.index-entry-link .index-meta { color: #777; }
   line-height: 1.5;
 }
 """
-
-
-def _normalize_text(text: str) -> str:
-    return re.sub(r"\s+", " ", (text or "").strip().lower())
-
-
-def _article_blurb(art: dict) -> str:
-    """Return an index blurb from the AI summary only — never raw body text."""
-    summary = (art.get("summary") or "").strip()
-    if not summary:
-        return ""
-
-    title_norm = _normalize_text(art.get("title", ""))
-    summary_norm = _normalize_text(summary)
-    if title_norm and summary_norm == title_norm:
-        return ""
-    if title_norm and summary_norm.startswith(title_norm):
-        extra = summary_norm[len(title_norm):].strip(" .:-–—")
-        if len(extra) < 40:
-            return ""
-    return summary
-
-
-def _truncate(text: str, max_chars: int) -> str:
-    text = (text or "").strip()
-    if len(text) <= max_chars:
-        return text
-    return text[: max_chars - 1].rsplit(" ", 1)[0] + "…"
-
-
-def _fallback_section_cover(category: str, articles: list[dict], hero: dict | None = None) -> dict:
-    """Build a readable section cover when AI generation fails."""
-    if not articles:
-        return {}
-    lead = lead_for_section(articles, hero) or articles[0]
-    headline = _truncate(lead.get("title", category), 80)
-    editorial = epub_label(
-        "fallback_section_editorial", count=len(articles), category=category
-    )
-    if lead:
-        editorial += " " + epub_label("fallback_section_lead") + " " + _truncate(
-            lead.get("summary") or lead["title"], 160
-        )
-    top_stories = []
-    for art in articles:
-        if hero and art is lead and len(articles) > 1:
-            continue
-        if len(top_stories) >= 3:
-            break
-        top_stories.append({
-            "title": art["title"],
-            "one_liner": _truncate(art.get("summary") or art["title"], 120),
-        })
-    if not top_stories:
-        top_stories = [{
-            "title": lead["title"],
-            "one_liner": _truncate(lead.get("summary") or lead["title"], 120),
-        }]
-    return {"headline": headline, "editorial": editorial, "top_stories": top_stories}
 
 
 def _body_paragraphs(text: str, drop_cap: bool = True) -> str:
@@ -348,131 +189,6 @@ def _article_body_html(art: dict) -> str:
         parts.append(f'<div class="article-body">{_body_paragraphs(body, drop_cap=False)}</div>')
 
     return "".join(parts)
-
-
-def _section_cover_xhtml(
-    category: str,
-    cover_data: dict,
-    articles: list[dict],
-    hero: dict | None = None,
-) -> bytes:
-    if not cover_data:
-        cover_data = _fallback_section_cover(category, articles, hero=hero)
-
-    if cover_data:
-        headline  = escape(cover_data.get("headline", ""))
-        editorial = escape(cover_data.get("editorial", ""))
-        top_stories_html = "".join(
-            f'<div class="lead-story">'
-            f'<h4>{escape(s.get("title",""))}</h4>'
-            f'<p>{escape(s.get("one_liner",""))}</p>'
-            f"</div>"
-            for s in cover_data.get("top_stories", [])
-        )
-        body = (
-            f'<div class="cat-cover">'
-            f'<p class="cat-title">{escape(category)}</p>'
-            f'<h2 class="cat-headline">{headline}</h2>'
-            f'<p class="editorial">{editorial}</p>'
-            f"{top_stories_html}"
-            f"</div>"
-        )
-    else:
-        body = (
-            f'<div class="cat-cover">'
-            f'<p class="cat-title">{escape(category)}</p>'
-            f"</div>"
-        )
-
-    return xhtml_page(category, body)
-
-
-def _index_page_filename(slug: str, page_num: int) -> str:
-    if page_num == 1:
-        return f"index_{slug}.xhtml"
-    return f"index_{slug}_{page_num:02d}.xhtml"
-
-
-def _section_index_entries_html(
-    articles: list[dict],
-    slug: str,
-    start_num: int,
-) -> str:
-    entries = []
-    for offset, art in enumerate(articles):
-        story_num = start_num + offset
-        art_slug = f"{slug}_{story_num:02d}"
-        blurb = _article_blurb(art)
-        blurb_tag = f'<p class="index-blurb">{escape(blurb)}</p>' if blurb else ""
-        source = (art.get("source") or "").strip()
-        title = art.get("title", "")
-        index_title = f"{source} — {title}" if source else title
-        score_line = (
-            f'<p class="index-relevance">{escape(epub_label("relevance"))} '
-            f"{relevance_display(art)}/10</p>"
-        )
-        meta_line = (
-            f'<p class="index-meta">{escape(art["published"])}</p>' if art.get("published") else ""
-        )
-        entries.append(
-            f'<a class="index-entry-link" href="article_{art_slug}.xhtml">'
-            f'<div class="index-entry">'
-            f'<p class="index-num">Story {story_num}</p>'
-            f"{score_line}"
-            f'<h2 class="index-title">{escape(index_title)}</h2>'
-            f"{meta_line}"
-            f"{blurb_tag}"
-            f"</div>"
-            f"</a>"
-        )
-    return "".join(entries)
-
-
-def _section_index_page_xhtml(
-    category: str,
-    page_articles: list[dict],
-    slug: str,
-    start_num: int,
-    total: int,
-    page_num: int,
-    total_pages: int,
-    prev_file: str | None,
-    next_file: str | None,
-) -> bytes:
-    end_num = start_num + len(page_articles) - 1
-    if total_pages == 1:
-        intro = (
-            f"{total} stories in this section, highest relevance first. "
-            "Tap a card to open the full article."
-        )
-    else:
-        intro = (
-            f"Stories {start_num}–{end_num} of {total} in {category}. "
-            f"Page {page_num} of {total_pages}."
-        )
-
-    nav_parts: list[str] = []
-    if prev_file:
-        nav_parts.append(f'<a href="{prev_file}">&#8592; Previous</a>')
-    if next_file:
-        nav_parts.append(f'<a href="{next_file}">Next &#8594;</a>')
-    nav_html = ""
-    if nav_parts:
-        nav_html = f'<p class="index-page-nav">{" &nbsp;|&nbsp; ".join(nav_parts)}</p>'
-
-    body = (
-        f"<h1>{escape(category)}</h1>"
-        f'<p class="section-index-intro">{intro}</p>'
-        f'<div class="section-index">{_section_index_entries_html(page_articles, slug, start_num)}</div>'
-        f"{nav_html}"
-    )
-    contents = epub_label("contents")
-    page_title = (
-        f"{category} — {contents}"
-        if total_pages == 1
-        else f"{category} — {contents} ({page_num}/{total_pages})"
-    )
-    return xhtml_page(page_title, body)
 
 
 def _article_xhtml(category: str, art: dict, index: int, total: int) -> bytes:
@@ -562,71 +278,12 @@ def generate_epub(
             continue
 
         slug = slugify(category)
-        section_links: list = []
-
-        sec_cover_ch = epub.EpubHtml(
-            title=f"{category} — Cover",
-            file_name=f"cover_{slug}.xhtml",
-            lang=lang,
-        )
-        sec_cover_ch.content = _section_cover_xhtml(
-            category, section_covers.get(category, {}), articles, hero=hero,
-        )
-        sec_cover_ch.add_item(css_item)
-        book.add_item(sec_cover_ch)
-        spine.append(sec_cover_ch)
-
-        page_size = get_settings().index_entries_per_page
-        total_pages = max(1, (len(articles) + page_size - 1) // page_size)
-        index_files: list[str] = []
-
-        for page_num in range(1, total_pages + 1):
-            start_idx = (page_num - 1) * page_size
-            page_articles = articles[start_idx : start_idx + page_size]
-            start_num = start_idx + 1
-            file_name = _index_page_filename(slug, page_num)
-            index_files.append(file_name)
-
-            prev_file = index_files[-2] if page_num > 1 else None
-            next_file = (
-                _index_page_filename(slug, page_num + 1)
-                if page_num < total_pages
-                else None
-            )
-
-            index_ch = epub.EpubHtml(
-                title=f"{category} — {contents}"
-                if total_pages == 1
-                else f"{category} — {contents} ({page_num}/{total_pages})",
-                file_name=file_name,
-                lang=lang,
-            )
-            index_ch.content = _section_index_page_xhtml(
-                category,
-                page_articles,
-                slug,
-                start_num,
-                len(articles),
-                page_num,
-                total_pages,
-                prev_file,
-                next_file,
-            )
-            index_ch.add_item(css_item)
-            book.add_item(index_ch)
-            spine.append(index_ch)
-
-        section_links.append(
-            epub.Link(index_files[0], contents, f"index_{slug}")
-        )
-        for page_num in range(2, total_pages + 1):
-            section_links.append(
-                epub.Link(
-                    index_files[page_num - 1],
-                    f"{contents} ({page_num}/{total_pages})",
-                    f"index_{slug}_{page_num:02d}",
-                )
-            )
+        section_ch = epub.EpubHtml(title=category, file_name=section_file(category), lang=lang)
+        section_ch.content = xhtml_page(category, section_body(category, layout))
+        section_ch.add_item(css_item)
+        book.add_item(section_ch)
+        spine.append(section_ch)
+        section_links: list = [epub.Link(section_file(category), category, f"section_{slug}")]
 
         total = len(articles)
         for i, art in enumerate(articles, start=1):

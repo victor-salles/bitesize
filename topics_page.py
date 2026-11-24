@@ -8,7 +8,7 @@ from typing import Optional
 from ai_locale import epub_label, format_count, format_decimal, format_short_date, tema_label
 from cover_data import capitalized
 from edition_data import EditionMeta, topic_mention_counts, topic_shares
-from epub_pages import CONTENTS_FILE, BookLayout, running_head, section_file, wavy_heading
+from epub_pages import CONTENTS_FILE, BookLayout, nav_bar, running_head, section_file, wavy_heading
 from topics_chart import ChartRow, Trend, render_topics_chart
 from xhtml import escape
 
@@ -172,10 +172,11 @@ def topics_body(data: TopicsData, layout: BookLayout, meta: EditionMeta) -> str:
         parts.append(f'<p class="where-row"><span class="where-name">{escape(row.name)}</span> {links}</p>')
 
     first_section = next(iter(layout.sections), None)
-    nav = [f'<td><a href="{CONTENTS_FILE}">&#8592; {escape(epub_label("contents_short"))}</a></td>']
-    if first_section:
-        nav.append(f'<td class="nav-right"><a href="{section_file(first_section)}">{escape(first_section)} &#8594;</a></td>')
-    parts.append(f'<table class="page-nav"><tr>{"".join(nav)}</tr></table>')
+    parts.append(nav_bar(
+        (CONTENTS_FILE, epub_label("contents_short")),
+        None,
+        (section_file(first_section), first_section) if first_section else None,
+    ))
     return "".join(parts)
 
 
@@ -207,11 +208,4 @@ a.story-pill {
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 0.7em; font-weight: bold;
   border: 0.1em solid #111111; padding: 0.1em 0.45em; margin-right: 0.2em; color: #111111;
 }
-table.page-nav { width: 100%; border-collapse: collapse; border-top: 0.12em solid #111111; margin-top: 1.2em; }
-table.page-nav td {
-  padding: 0.7em 0; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 0.7em;
-  font-weight: bold; letter-spacing: 0.1em; text-transform: uppercase;
-}
-table.page-nav td.nav-center { text-align: center; }
-table.page-nav td.nav-right { text-align: right; }
 """
