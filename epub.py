@@ -9,6 +9,7 @@ from ebooklib import epub
 from ai_locale import ai_language_code, epub_label, format_digest_date, format_tag_line
 from config import get_settings
 from cover_art import render_magazine_cover
+from edition_data import EditionMeta
 from gemini import article_relevance, relevance_display
 from magazine_layers import (
     cover_teasers,
@@ -755,9 +756,11 @@ def generate_epub(
     section_covers: dict[str, dict],
     global_cover: dict,
     output_path: Path,
+    meta: EditionMeta | None = None,
 ) -> None:
+    meta = meta or EditionMeta(now=datetime.now())
     book = epub.EpubBook()
-    now  = datetime.now()
+    now  = meta.now
 
     lang = ai_language_code()
     digest = epub_label("digest_title")

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Abertura de editoria</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,800&amp;family=Inter:wght@400;500;600;700;800&amp;family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#111;text-decoration:none}a:hover{color:#3a3a3a}
+</style>
+</helmet>
+<div style="width: 600px; height: 800px; box-sizing: border-box; padding: 26px 32px; display: flex; flex-direction: column; background: #ffffff; color: #111111; font-family: 'Source Serif 4', Georgia, serif">
+
+  <div style="display: flex; flex-direction: column; gap: 10px; margin: -26px -32px 0; background: #111111; color: #ffffff; padding: 26px 32px 22px">
+    <div style="display: flex; justify-content: space-between; margin-bottom: 14px; font-family: Inter, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #bdbdbd">
+      <span>Editoria 1 de 3</span>
+      <span>3 matérias · 11 min</span>
+    </div>
+    <h1 style="margin: 0; font-family: Fraunces, Georgia, serif; font-size: 60px; font-weight: 800; line-height: 1; letter-spacing: -0.03em">Tecnologia</h1>
+    <span style="font-family: Inter, sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #cfcfcf">Jornal Exemplo · Revista Modelo · Portal Fictício</span>
+  </div>
+
+  <a href="Article.dc.html" style="display: flex; flex-direction: column; gap: 8px; padding: 18px 0 16px; border-bottom: 2px solid #111111">
+    <span style="font-family: Inter, sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #595959">01 · Destaque · Jornal Exemplo</span>
+    <span style="font-size: 26px; font-weight: 700; line-height: 1.15">Cidade testa ônibus elétricos sem motorista em linha noturna</span>
+    <span style="font-size: 16px; line-height: 1.45; color: #3a3a3a">Piloto de seis meses cobre 12 km entre o centro e o aeroporto, com um operador a bordo.</span>
+    <div style="display: flex; align-items: center; gap: 10px; font-family: Inter, sans-serif; font-size: 11px; font-weight: 600; color: #595959">
+      <span style="display: flex; gap: 2px"><sc-for list="{{bar}}" as="s" hint-placeholder-count="10"><span style="width: 7px; height: 7px; box-sizing: border-box; border: 1px solid #111111; background: {{s.bg}}; display: inline-block"></span></sc-for></span>
+      <span>9,2</span><span>·</span><span>5 min</span><span>·</span><span>artigo completo</span>
+    </div>
+  </a>
+
+  <sc-for list="{{items}}" as="it" hint-placeholder-count="2">
+    <a href="Article.dc.html" style="display: grid; grid-template-columns: 40px minmax(0, 1fr); column-gap: 12px; padding: 14px 0; border-bottom: 1px solid #d4d4d4">
+      <span style="font-family: Inter, sans-serif; font-size: 18px; font-weight: 800; line-height: 1.2">{{it.n}}</span>
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <span style="font-family: Inter, sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #595959">{{it.src}}</span>
+        <span style="font-size: 18px; font-weight: 700; line-height: 1.25">{{it.title}}</span>
+        <span style="font-size: 15px; line-height: 1.4; color: #3a3a3a">{{it.dek}}</span>
+        <span style="font-family: Inter, sans-serif; font-size: 11px; font-weight: 600; color: #595959">{{it.meta}}</span>
+      </div>
+    </a>
+  </sc-for>
+
+  <div style="flex-grow: 1"></div>
+
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 2px solid #111111; font-family: Inter, sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase">
+    <a href="Opening.dc.html" style="padding: 12px 0; min-height: 44px; box-sizing: border-box">← Sumário</a>
+    <a href="Article.dc.html" style="padding: 12px 0; text-align: center; min-height: 44px; box-sizing: border-box">Começar a ler</a>
+    <a href="Section.dc.html" style="padding: 12px 0; text-align: right; min-height: 44px; box-sizing: border-box">Ciência →</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":600,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      bar: Array.from({ length: 10 }, (_, i) => ({ bg: i < 9 ? '#111111' : '#ffffff' })),
+      items: [
+        { n: '02', src: 'Revista Modelo', title: 'Nova bateria de sódio promete carga completa em dez minutos', dek: 'Laboratório divulga protótipo sem lítio; produção em escala ainda depende de testes de durabilidade.', meta: 'Relevância 8,1 · 4 min · artigo completo' },
+        { n: '03', src: 'Portal Fictício', title: 'Aplicativo de leitura ganha modo offline para trens e metrô', dek: 'Atualização baixa as edições do dia de madrugada e sincroniza as marcações depois.', meta: 'Relevância 6,4 · 2 min · resumo' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

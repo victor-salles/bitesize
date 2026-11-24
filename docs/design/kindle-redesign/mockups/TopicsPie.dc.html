@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Temas da edição · pizza</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,800;1,9..144,500&amp;family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#111;text-decoration:none}a:hover{color:#3a3a3a}
+</style>
+</helmet>
+<div style="width: 600px; height: 800px; box-sizing: border-box; padding: 26px 32px; display: flex; flex-direction: column; background: #ffffff; color: #111111; font-family: Inter, sans-serif">
+
+  <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #595959">
+    <span>BiteSIze</span>
+    <span>Dom · 8 nov 2026 · 7 matérias · 6 temas</span>
+  </div>
+
+  <div style="display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 14px">
+    <svg aria-hidden="true" width="110" height="8" viewBox="0 0 125 8" style="flex: none"><path d="M0 4 Q3 1.5 7 4 Q11 6.8 14 4 Q19 0.6 25 4 Q28 6 31 4 Q34 2.2 38 4 Q44 7.6 50 4 Q53 2 56 4 Q60 6.2 63 4 Q68 0.8 75 4 Q78 5.8 81 4 Q85 1.8 89 4 Q95 7.4 100 4 Q103 2.6 106 4 Q110 6.4 114 4 Q119 1 125 4" fill="none" stroke="#a3a3a3" stroke-width="1" stroke-linecap="round"></path></svg>
+    <h1 style="margin: 0; font-family: Fraunces, Georgia, serif; font-size: 32px; font-weight: 800; line-height: 1.1; letter-spacing: -0.02em">Temas da edição</h1>
+    <svg aria-hidden="true" width="110" height="8" viewBox="0 0 125 8" style="flex: none"><path d="M0 4 Q5 1 10 4 Q13 6.2 16 4 Q20 1.6 24 4 Q30 7.8 36 4 Q39 2.4 42 4 Q46 6 49 4 Q55 0.4 62 4 Q65 5.6 68 4 Q72 2 76 4 Q82 7.2 87 4 Q90 2.8 93 4 Q98 6.6 102 4 Q108 1.2 114 4 Q118 6 121 4 Q123 3 125 4" fill="none" stroke="#a3a3a3" stroke-width="1" stroke-linecap="round"></path></svg>
+  </div>
+  <span style="margin-top: 4px; text-align: center; font-family: Fraunces, Georgia, serif; font-style: italic; font-size: 15px; color: #3a3a3a">Do que a edição falou hoje — 14 menções de tema em 7 matérias.</span>
+
+  <div style="display: grid; grid-template-columns: 250px minmax(0, 1fr); column-gap: 28px; align-items: center; margin-top: 22px">
+    <div style="position: relative; width: 250px; height: 250px">
+      <div style="width: 250px; height: 250px; border-radius: 50%; background: {{pie}}"></div>
+      <sc-for list="{{topics}}" as="t" hint-placeholder-count="6">
+        <span style="position: absolute; left: {{t.px}}; top: {{t.py}}; transform: translate(-50%, -50%); background: #ffffff; color: #111111; border: 1.5px solid #111111; border-radius: 10px; padding: 1px 7px; font-size: 11px; font-weight: 800; white-space: nowrap">{{t.pct}}</span>
+      </sc-for>
+    </div>
+
+    <div style="display: flex; flex-direction: column">
+      <div style="display: flex; justify-content: space-between; padding-bottom: 8px; border-bottom: 2px solid #111111; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase">
+        <span>Tema</span><span>Matérias</span>
+      </div>
+      <sc-for list="{{topics}}" as="t" hint-placeholder-count="6">
+        <div style="display: grid; grid-template-columns: 14px minmax(0, 1fr) 24px 48px; column-gap: 10px; align-items: center; padding: 8px 0">
+          <span style="width: 14px; height: 14px; border-radius: 3px; background: {{t.shade}}; box-shadow: inset 0 0 0 1px #b0b0b0"></span>
+          <span style="font-family: Fraunces, Georgia, serif; font-size: 17px; font-weight: 800">{{t.name}}</span>
+          <span style="font-size: 13px; font-weight: 600; color: #595959; text-align: right">{{t.count}}</span>
+          <span style="font-size: 13px; font-weight: 800; text-align: right">{{t.pctLong}}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display: flex; justify-content: space-between; margin-top: 26px; padding-bottom: 6px; border-bottom: 2px solid #111111; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase">
+    <span>Onde ler</span><span style="color: #595959">toque no número</span>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 20px; row-gap: 8px; margin-top: 10px">
+    <sc-for list="{{topics}}" as="t" hint-placeholder-count="6">
+      <div style="display: flex; align-items: center; gap: 8px">
+        <span style="width: 10px; height: 10px; flex: none; border-radius: 2px; background: {{t.shade}}; box-shadow: inset 0 0 0 1px #b0b0b0"></span>
+        <span style="font-size: 13px; font-weight: 700; min-width: 80px">{{t.name}}</span>
+        <div style="display: flex; gap: 4px; flex-wrap: wrap">
+          <sc-for list="{{t.links}}" as="n" hint-placeholder-count="2">
+            <a href="Article.dc.html" style="min-width: 32px; height: 26px; box-sizing: border-box; border: 1.5px solid #111111; border-radius: 13px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800">{{n.n}}</a>
+          </sc-for>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="flex-grow: 1"></div>
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 2px solid #111111; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase">
+    <a href="Opening.dc.html" style="padding: 12px 0; min-height: 44px; box-sizing: border-box">← Sumário</a>
+    <a href="Section.dc.html" style="padding: 12px 0; text-align: right; min-height: 44px; box-sizing: border-box">Tecnologia →</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":600,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const shades = ['#111111', '#3d3d3d', '#636363', '#8a8a8a', '#b0b0b0', '#d0d0d0'];
+    const data = [
+      { name: 'Tecnologia', refs: ['01', '02', '03', '06'] },
+      { name: 'Ciência', refs: ['02', '04', '05'] },
+      { name: 'Brasil', refs: ['01', '06', '07'] },
+      { name: 'Economia', refs: ['06', '07'] },
+      { name: 'Clima', refs: ['05'] },
+      { name: 'Mundo', refs: ['07'] }
+    ];
+    const total = data.reduce((s, d) => s + d.refs.length, 0);
+    let acc = 0;
+    const stops = [];
+    const topics = data.map((d, i) => {
+      const share = (d.refs.length / total) * 100;
+      const start = acc;
+      const end = acc + share;
+      acc = end;
+      stops.push(shades[i] + ' ' + start.toFixed(2) + '%', shades[i] + ' ' + (end - 0.35).toFixed(2) + '%', '#ffffff ' + (end - 0.35).toFixed(2) + '%', '#ffffff ' + end.toFixed(2) + '%');
+      const mid = ((start + end) / 2) * 3.6 * Math.PI / 180;
+      const r = share < 10 ? 104 : 80;
+      return {
+        name: d.name,
+        count: String(d.refs.length),
+        pct: Math.round(share) + '%',
+        pctLong: share.toFixed(1).replace('.', ',') + '%',
+        shade: shades[i],
+        links: d.refs.map((n) => ({ n })),
+        px: (125 + r * Math.sin(mid)).toFixed(1) + 'px',
+        py: (125 - r * Math.cos(mid)).toFixed(1) + 'px'
+      };
+    });
+    return { topics, pie: 'conic-gradient(' + stops.join(', ') + ')' };
+  }
+}
+</script>
+</body>
+</html>

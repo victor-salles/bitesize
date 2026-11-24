@@ -21,6 +21,7 @@ from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn
 from ai import AIClient, use_ai_client
 from ai_locale import epub_label, format_digest_timestamp
 from config import console, get_settings, submit_in_context, use_settings
+from edition_data import EditionMeta, topic_mention_counts
 from epub import generate_epub
 from feed import fetch_article_content, fetch_feed, filter_headline_only
 from safe_fetch import FetchError
@@ -68,6 +69,11 @@ class EditionConfig:
     article_cache: Optional[ArticleCache] = None
     extra_sections: list[ExtraSection] = field(default_factory=list)
     now: Optional[datetime] = None
+    # The reader's Nth edition, shown as "Edição N"; None hides it.
+    edition_number: Optional[int] = None
+    # Topic mention counts of the reader's previous edition, for the "vs. ontem"
+    # trend on the topics page; None hides the trend.
+    previous_topic_counts: Optional[dict[str, int]] = None
 
     def effective_settings(self) -> Settings:
         overrides = {}
@@ -88,6 +94,8 @@ class EditionResult:
     filtered_count: int = 0
     article_count: int = 0
     section_counts: dict[str, int] = field(default_factory=dict)
+    # {tema: mentions}: an article with two temas counts in both.
+    topic_counts: dict[str, int] = field(default_factory=dict)
 
 
 def _log_blocked(blocked: list[dict]) -> None:
@@ -331,7 +339,14 @@ def _build(config: EditionConfig) -> EditionResult:
     out_path = Path(config.output_dir) / filename
 
     with console.status("[cyan]Generating EPUB…[/cyan]"):
-        generate_epub(processed_sections, section_covers, global_cover, out_path)
+        generate_epub(
+            processed_sections, section_covers, global_cover, out_path,
+            meta=EditionMeta(
+                now=now,
+                edition_number=config.edition_number,
+                previous_topic_counts=config.previous_topic_counts,
+            ),
+        )
 
     total_final = sum(len(v) for v in processed_sections.values())
     console.print(f"\n[bold green]✅  Done![/bold green]  {total_final} articles saved.")
@@ -340,4 +355,5 @@ def _build(config: EditionConfig) -> EditionResult:
     result.epub_path = out_path
     result.article_count = total_final
     result.section_counts = {cat: len(arts) for cat, arts in processed_sections.items()}
+    result.topic_counts = topic_mention_counts(processed_sections)
     return result

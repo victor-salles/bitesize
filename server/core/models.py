@@ -134,6 +134,8 @@ class Edition(models.Model):
     filtered_count = models.PositiveIntegerField(default=0)
     article_count = models.PositiveIntegerField(default=0)
     section_counts = models.JSONField(default=dict, blank=True)
+    # {tema: mentions}; the next edition compares its own against these.
+    topic_counts = models.JSONField(default=dict, blank=True)
 
     class Meta:
         ordering = ["-edition_date", "-queued_at"]
@@ -144,6 +146,12 @@ class Edition(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user} {self.edition_date} ({self.status})"
+
+    def earlier_built(self):
+        """This user's succeeded editions dated before this one, latest first."""
+        return Edition.objects.filter(
+            user_id=self.user_id, status=Edition.Status.SUCCEEDED, edition_date__lt=self.edition_date
+        ).order_by("-edition_date")
 
     @property
     def run_time(self):
@@ -157,6 +165,7 @@ class Edition(models.Model):
         for field in ("raw_count", "full_text_count", "kept_count", "filtered_count", "article_count"):
             setattr(self, field, getattr(result, field, 0))
         self.section_counts = dict(getattr(result, "section_counts", {}))
+        self.topic_counts = dict(getattr(result, "topic_counts", {}))
         self.save()
 
 

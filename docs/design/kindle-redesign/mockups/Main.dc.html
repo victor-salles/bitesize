@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Capa A · Jornal</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&amp;family=Inter:wght@400;500;600;700&amp;family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#111}a:hover{color:#3a3a3a}
+</style>
+</helmet>
+<div style="width: 600px; height: 800px; box-sizing: border-box; padding: 36px 44px 24px; display: flex; flex-direction: column; background: {{bg}}; color: {{fg}}; font-family: 'Source Serif 4', Georgia, serif">
+
+  <div style="display: flex; justify-content: space-between; align-items: center; font-family: Inter, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: {{muted}}">
+    <span>Domingo</span>
+    <span>8 de novembro de 2026</span>
+    <span>7 matérias · 21 min</span>
+  </div>
+
+  <div style="border-top: 4px solid {{fg}}; margin-top: 10px"></div>
+  <div style="border-top: 1px solid {{fg}}; margin-top: 3px"></div>
+
+  <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 40px">
+    <div style="display: flex; align-items: center; gap: 10px; font-family: Inter, sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase">
+      <span style="display: flex; gap: 3px"><sc-for list="{{bar}}" as="s" hint-placeholder-count="10"><span style="width: 9px; height: 9px; box-sizing: border-box; border: 1.5px solid {{fg}}; background: {{s.bg}}; display: inline-block"></span></sc-for></span>
+      <span>9,2</span>
+      <span style="color: {{muted}}">· Tecnologia · Jornal Exemplo</span>
+    </div>
+    <h2 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 52px; line-height: 1.04; letter-spacing: -0.02em">Cidade testa ônibus elétricos sem motorista em linha noturna</h2>
+    <p style="margin: 0; font-size: 19px; line-height: 1.4; color: {{soft}}">Piloto de seis meses cobre 12 km entre o centro e o aeroporto, com um operador a bordo.</p>
+  </div>
+
+  <div style="display: flex; align-items: baseline; justify-content: space-between; margin-top: 36px; border-bottom: 2px solid {{fg}}; padding-bottom: 6px; font-family: Inter, sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase">
+    <span>Também nesta edição</span>
+    <span style="color: {{muted}}">leitura</span>
+  </div>
+  <sc-for list="{{teasers}}" as="t" hint-placeholder-count="3">
+    <div style="display: grid; grid-template-columns: 44px minmax(0, 1fr) 48px; column-gap: 12px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid {{rule}}">
+      <span style="font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 26px; line-height: 1">{{t.n}}</span>
+      <div style="display: flex; flex-direction: column; gap: 3px">
+        <span style="font-family: Inter, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: {{muted}}">{{t.kicker}}</span>
+        <span style="font-family: Inter, sans-serif; font-size: 17px; font-weight: 600; line-height: 1.25">{{t.title}}</span>
+      </div>
+      <span style="font-family: Inter, sans-serif; font-size: 13px; color: {{muted}}; text-align: right">{{t.page}}</span>
+    </div>
+  </sc-for>
+
+  <div style="flex-grow: 1; min-height: 18px"></div>
+
+  <div style="display: flex; justify-content: space-between; align-items: baseline; font-family: Inter, sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase">
+    <span>Temas da edição</span>
+    <span style="color: {{muted}}">14 menções · 7 matérias</span>
+  </div>
+  <div style="display: flex; gap: 2px; height: 12px; margin-top: 8px; border-radius: 6px; overflow: hidden">
+    <sc-for list="{{topics}}" as="tp" hint-placeholder-count="6">
+      <div style="flex: {{tp.count}} 1 0; background: {{tp.shade}}"></div>
+    </sc-for>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 12px; row-gap: 6px; margin-top: 10px; font-family: Inter, sans-serif; font-size: 12px">
+    <sc-for list="{{topics}}" as="tp" hint-placeholder-count="6">
+      <div style="display: flex; align-items: center; gap: 7px">
+        <span style="width: 10px; height: 10px; flex: none; border-radius: 2px; background: {{tp.shade}}; box-shadow: inset 0 0 0 1px {{rule}}"></span>
+        <span style="font-weight: 600; color: {{soft}}">{{tp.name}}</span>
+        <span style="margin-left: auto; font-weight: 700">{{tp.pct}}</span>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="display: flex; align-items: center; gap: 14px; margin-top: 22px">
+    <div style="flex: 1 1 0; border-top: 1px solid {{rule}}"></div>
+    <span style="font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 22px; letter-spacing: -0.01em">BiteSIze</span>
+    <div style="flex: 1 1 0; border-top: 1px solid {{rule}}"></div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"invert":{"editor":"boolean","default":false},"teasers":{"editor":"int","default":3,"min":2,"max":4},"$preview":{"width":600,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const inv = this.props.invert ?? false;
+    const n = Math.max(2, Math.min(4, this.props.teasers ?? 3));
+    const all = [
+      { n: '02', kicker: 'Ciência · Revista Modelo', title: 'Sonda registra gêiseres de gelo em lua de Saturno', page: '3 min' },
+      { n: '03', kicker: 'Tecnologia · Revista Modelo', title: 'Nova bateria de sódio promete carga completa em dez minutos', page: '4 min' },
+      { n: '04', kicker: 'Economia · Diário Demo', title: 'Feiras de bairro passam a aceitar pagamento por aproximação', page: '2 min' },
+      { n: '05', kicker: 'Ciência · Portal Fictício', title: 'Recife artificial atrai 60 espécies de peixes em dois anos', page: '3 min' }
+    ];
+    const shades = inv
+      ? ['#ffffff', '#d6d6d6', '#adadad', '#858585', '#5e5e5e', '#3d3d3d']
+      : ['#111111', '#3d3d3d', '#636363', '#8a8a8a', '#b0b0b0', '#d0d0d0'];
+    const tdata = [['Tecnologia', 4, '29%'], ['Ciência', 3, '21%'], ['Brasil', 3, '21%'], ['Economia', 2, '14%'], ['Clima', 1, '7%'], ['Mundo', 1, '7%']];
+    return {
+      topics: tdata.map((t, i) => ({ name: t[0], count: t[1], pct: t[2], shade: shades[i] })),
+      bar: Array.from({ length: 10 }, (_, i) => ({ bg: i < 9 ? (inv ? '#ffffff' : '#111111') : 'transparent' })),
+      teasers: all.slice(0, n),
+      bg: inv ? '#111111' : '#ffffff',
+      fg: inv ? '#ffffff' : '#111111',
+      soft: inv ? '#d4d4d4' : '#3a3a3a',
+      muted: inv ? '#a3a3a3' : '#595959',
+      mid: inv ? '#a3a3a3' : '#6b6b6b',
+      rule: inv ? '#4a4a4a' : '#cfcfcf'
+    };
+  }
+}
+</script>
+</body>
+</html>
