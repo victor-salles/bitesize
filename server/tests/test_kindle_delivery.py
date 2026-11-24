@@ -102,11 +102,11 @@ def test_delivery_emails_the_epub_to_the_kindle_address(tmp_path, resend, frozen
                 "json": {
                     "from": "BiteSIze <bitesize@victorsalles.com>",
                     "to": ["ana_42@kindle.com"],
-                    "subject": "BiteSIze 2026-11-14",
+                    "subject": "BiteSIze – 14 de novembro de 2026",
                     "text": "Your BiteSIze edition for 2026-11-14 is attached.",
                     "attachments": [
                         {
-                            "filename": "bitesize-2026-11-14.epub",
+                            "filename": "BiteSIze – 14 de novembro de 2026.epub",
                             "content": base64.b64encode(EPUB_BYTES).decode("ascii"),
                         }
                     ],
