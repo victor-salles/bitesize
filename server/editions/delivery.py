@@ -82,6 +82,7 @@ def send_epub(edition: Edition) -> None:
     epub = _read_epub(edition.epub_path)
 
     day = edition.edition_date.isoformat()
+    title = kindle_title(edition)
     try:
         response = requests.post(
             RESEND_URL,
@@ -89,10 +90,10 @@ def send_epub(edition: Edition) -> None:
             json={
                 "from": settings.DELIVERY_FROM_EMAIL,
                 "to": [kindle_email],
-                "subject": f"BiteSIze {day}",
+                "subject": title,
                 "text": f"Your BiteSIze edition for {day} is attached.",
                 "attachments": [
-                    {"filename": f"bitesize-{day}.epub", "content": base64.b64encode(epub).decode("ascii")}
+                    {"filename": f"{title}.epub", "content": base64.b64encode(epub).decode("ascii")}
                 ],
             },
             timeout=REQUEST_TIMEOUT,
@@ -101,6 +102,17 @@ def send_epub(edition: Edition) -> None:
         raise DeliveryError(f"Could not reach Resend: {type(exc).__name__}: {exc}") from exc
     if not response.ok:
         raise DeliveryError(f"Resend answered {response.status_code}: {_error_message(response)}")
+
+
+def kindle_title(edition) -> str:
+    """The name the Kindle library shows: Send to Kindle titles an emailed EPUB after its file name."""
+    from ai_locale import EPUB_LABELS
+
+    language = edition.user.profile.language
+    month = EPUB_LABELS.get(language, EPUB_LABELS["en"])["months"][edition.edition_date.month - 1]
+    day, year = edition.edition_date.day, edition.edition_date.year
+    date = f"{day} de {month} de {year}" if language == "pt-BR" else f"{day} {month} {year}"
+    return f"BiteSIze – {date}"
 
 
 def _read_epub(epub_path: str) -> bytes:
