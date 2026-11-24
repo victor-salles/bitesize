@@ -49,11 +49,11 @@ class DatabaseArticleCache:
                 "text_length": len(_text(art)),
                 "text_hash": text_hash(art),
                 "skipped": skipped,
-                "summary": "" if skipped else result.get("summary", ""),
+                "summary": "" if skipped else (result.get("summary") or ""),
                 "score": None if skipped else result.get("relevance"),
                 "tags": {} if skipped else {
                     "tipo": result.get("tipo"),
-                    "temas": list(result.get("temas", [])),
+                    "temas": list(result.get("temas") or []),
                     **{key: result[key] for key in OPTIONAL_AI_FIELDS if result.get(key)},
                 },
             },

@@ -12,3 +12,11 @@ def build_user_edition(edition_id: int) -> str:
     if isinstance(edition, str):
         return edition
     return services.build_claimed_edition(edition)
+
+
+@task
+def deliver_edition(edition_id: int) -> str:
+    """Email one built edition to its reader's Kindle. Returns its delivery status or "skipped"."""
+    from . import delivery
+
+    return delivery.deliver(edition_id)

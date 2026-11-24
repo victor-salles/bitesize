@@ -225,7 +225,7 @@ def build_claimed_edition(edition: Edition) -> str:
     edition.finished_at = timezone.now()
     edition.save(update_fields=["status", "finished_at"])
 
-    # Hook point for delivery (#66): the EPUB is at edition.epub_path.
+    # Delivery (#66) receives this and queues its own task (editions.delivery).
     for receiver, response in edition_built.send_robust(sender=Edition, edition=edition):
         if isinstance(response, Exception):
             logger.error("edition_built receiver %r failed for edition %s", receiver, edition.pk, exc_info=response)

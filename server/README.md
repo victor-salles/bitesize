@@ -55,6 +55,8 @@ python server/manage.py add_starter_sources <username> [--category Tech ...]
 | `GEMINI_API_KEY` | empty | Server's Gemini API key. Empty means no AI: editions build without summaries. Set it with `dokku config:set`, never in git |
 | `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Any current Gemini model code |
 | `GEMINI_DAILY_REQUEST_CAP` | `200` | Gemini requests per day (server time zone), covers included. Past it, editions build without summaries |
+| `RESEND_API_KEY` | empty | Resend API key for emailing editions to Kindles. Empty means every delivery fails with that reason. Set it with `dokku config:set`, never in git |
+| `DELIVERY_FROM_EMAIL` | `BiteSIze <bitesize@victorsalles.com>` | Sender of edition emails. Its domain must be verified in Resend, and readers add the bare address to Amazon's Approved Personal Document E-mail List |
 
 ## Accounts
 
@@ -105,6 +107,12 @@ One at a time is how the server fits the 1 GB droplet:
 The build fetches feeds, article pages and paywall mirrors through `safe_fetch.py` (repo root), with the same rules as adding a source, and connects to the address it checked. An article whose link points at a private or non-web address is logged and left out; the edition still builds.
 
 After an edition is built, the worker sends the `editions.signals.edition_built` signal. Delivery connects there.
+
+## Kindle delivery
+
+`editions.delivery` receives `edition_built` and queues `editions.tasks.deliver_edition` on the same worker, so a slow or failed send never fails the build. The task emails the EPUB as an attachment to the reader's Kindle address through Resend's HTTP API (`POST https://api.resend.com/emails`) and records `delivered` (with `delivered_at`) or `failed` with the reason in `delivery_error`. A missing `RESEND_API_KEY`, a missing Kindle address, a missing EPUB, an EPUB over 30 MB (Resend takes 40 MB per email after base64; Kindle takes 50 MB) or an error from Resend all end as `failed`.
+
+`/editions/` shows each built edition's delivery status. Failed deliveries can be sent again from the admin (Editions → "Resend delivery of selected editions"). The Delivery tab tells readers to approve the sender address in Amazon; Kindle drops mail from senders that are not on that list.
 
 ## Daily schedule
 
